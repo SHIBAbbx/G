@@ -502,7 +502,7 @@ do
     })
 
     Tabs.Teleport:AddInput("PlayerSearchInput", {
-        Title = "🔍 Search Player Name (พิมพ์ชื่อค้นหาผู้เล่น)",
+        Title = "🔍 Search Player Name",
         Default = "",
         Placeholder = "พิมพ์ Username หรือ DisplayName...",
         Numeric = false,
@@ -513,7 +513,7 @@ do
     })
 
     PlayerDropdown = Tabs.Teleport:AddDropdown("PlayerTargetDropdown", {
-        Title = "Select Player from List (หรือเลือกจากรายการ)",
+        Title = "Select Player from List",
         Values = getPlayerNames(),
         Multi = false,
         Default = 1,
