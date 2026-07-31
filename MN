@@ -11,7 +11,7 @@ local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
--- ตัวแปรระบบ Save/Teleport/Fling และ Spectate
+-- ตัวแปรระบบ Save/Teleport และ Spectate
 local savedCFrame = nil
 local SelectedPlayerName = nil
 local TargetInputName = ""
@@ -32,26 +32,24 @@ local Settings = {
     },
     InfStamina = { Enabled = false, MaxStamina = 100 },
     AntiVoid = { Enabled = false, VoidYLimit = -50, BounceForce = 150, UseTeleportBack = true },
-    AntiBlur = { Enabled = false },
-    WalkFling = { Enabled = false },
-    AntiFling = { Enabled = false }
+    AntiBlur = { Enabled = false }
 }
 
 -- ==========================================
--- 🏗️ สร้างหน้าต่างหลัก Fluent GUI
+-- 🏗️ สร้างหน้าต่างหลัก Fluent GUI (ปุ่มเปิด-ปิด: ALT ขวา)
 -- ==========================================
 local Window = Fluent:CreateWindow({
     Title = "MyMono x Gemini Hub",
-    SubTitle = "Ultimate Edition",
+    SubTitle = "Performance Edition",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
     Acrylic = true,
     Theme = "Dark",
-    MinimizeKey = Enum.KeyCode.LeftControl
+    MinimizeKey = Enum.KeyCode.RightAlt
 })
 
 local Tabs = {
-    Movement = Window:AddTab({ Title = "Movement & Combat", Icon = "sword" }),
+    Movement = Window:AddTab({ Title = "Movement", Icon = "activity" }),
     Teleport = Window:AddTab({ Title = "Teleportation", Icon = "map-pin" }),
     Visuals = Window:AddTab({ Title = "ESP & Visuals", Icon = "eye" }),
     Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
@@ -122,41 +120,7 @@ myStText.TextSize = 13
 myStText.Parent = myStBg
 
 -- ==========================================
--- 💥 2. ระบบ Walk Fling & Anti Fling
--- ==========================================
-RunService.Heartbeat:Connect(function()
-    if Settings.WalkFling.Enabled then
-        local char = LocalPlayer.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        if root then
-            local oldVel = root.AssemblyLinearVelocity
-            root.AssemblyLinearVelocity = Vector3.new(10000, 10000, 10000)
-            RunService.RenderStepped:Wait()
-            if root then
-                root.AssemblyLinearVelocity = oldVel
-            end
-        end
-    end
-end)
-
-RunService.Stepped:Connect(function()
-    if Settings.AntiFling.Enabled then
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer and p.Character then
-                for _, part in ipairs(p.Character:GetChildren()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = false
-                        part.AssemblyLinearVelocity = Vector3.zero
-                        part.AssemblyAngularVelocity = Vector3.zero
-                    end
-                end
-            end
-        end
-    end
-end)
-
--- ==========================================
--- 🔄 3. ระบบ Anti-Void (กันตกแมพ)
+-- 🔄 2. ระบบ Anti-Void (กันตกแมพ)
 -- ==========================================
 local lastSafeCFrame = nil
 RunService.Heartbeat:Connect(function()
@@ -189,7 +153,7 @@ RunService.Heartbeat:Connect(function()
 end)
 
 -- ==========================================
--- 🔄 4. ระบบ Infinite Stamina
+-- 🔄 3. ระบบ Infinite Stamina
 -- ==========================================
 RunService.Heartbeat:Connect(function()
     if not Settings.InfStamina.Enabled then return end
@@ -213,7 +177,7 @@ RunService.Heartbeat:Connect(function()
 end)
 
 -- ==========================================
--- 🔄 5. ระบบ Overhead Player ESP
+-- 🔄 4. ระบบ Overhead Player ESP
 -- ==========================================
 local ESPCache = {}
 
@@ -331,7 +295,7 @@ Players.PlayerRemoving:Connect(cleanupESP)
 
 -- Loop Real-time ควบคุมระบบต่าง ๆ
 RunService.RenderStepped:Connect(function()
-    -- 5.1 อัปเดต HUD ของตัวเอง
+    -- 4.1 อัปเดต HUD ของตัวเอง
     if Settings.LocalHUD.Enabled then
         local myChar = LocalPlayer.Character
         if myChar then
@@ -357,7 +321,7 @@ RunService.RenderStepped:Connect(function()
         myHudFrame.Visible = false
     end
 
-    -- 5.2 Dynamic ESP Loop
+    -- 4.2 Dynamic ESP Loop
     local myChar = LocalPlayer.Character
     local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
 
@@ -406,7 +370,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- 5.3 Spectate Camera Lock
+    -- 4.3 Spectate Camera Lock
     if Spectating then
         local camera = Workspace.CurrentCamera
         local targetPlayer = getTargetPlayer()
@@ -421,7 +385,7 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- ==========================================
--- 🔄 6. ระบบ Anti-Blur
+-- 🔄 5. ระบบ Anti-Blur & Helper Functions
 -- ==========================================
 local function removeBlurEffects()
     for _, v in ipairs(Lighting:GetDescendants()) do
@@ -432,7 +396,6 @@ local function removeBlurEffects()
     end
 end
 
--- ฟังก์ชันค้นหาผู้เล่นจากชื่อ
 function getTargetPlayer()
     if TargetInputName ~= "" then
         local searchStr = string.lower(TargetInputName)
@@ -451,7 +414,6 @@ function getTargetPlayer()
     return nil
 end
 
--- ฟังก์ชันดึงรายชื่อผู้เล่นเพื่ออัปเดต Dropdown
 local function getPlayerNames()
     local names = {}
     for _, p in ipairs(Players:GetPlayers()) do
@@ -472,7 +434,6 @@ end
 Players.PlayerAdded:Connect(refreshPlayerDropdown)
 Players.PlayerRemoving:Connect(refreshPlayerDropdown)
 
--- ฟังก์ชันวาร์ปกลางไปตำแหน่งที่บันทึก
 local function teleportToSaved()
     local char = LocalPlayer.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -495,27 +456,12 @@ local function teleportToSaved()
 end
 
 -- ==========================================
--- 🛠️ สร้าง UI Components ตามหมวดหมู่
+-- 🛠️ สร้าง UI Components
 -- ==========================================
 do
     -- --------------------------------------
-    -- TAB 1: Movement & Combat
+    -- TAB 1: Movement
     -- --------------------------------------
-    Tabs.Movement:AddParagraph({
-        Title = "Fling Controls",
-        Content = "ระบบชนคนลอยและป้องกันการโดน Fling"
-    })
-
-    local WalkFlingToggle = Tabs.Movement:AddToggle("WalkFlingToggle", { Title = "💥 Walk Fling (เปิดโหมดชนคนลอย)", Default = false })
-    WalkFlingToggle:OnChanged(function(Value)
-        Settings.WalkFling.Enabled = Value
-    end)
-
-    local AntiFlingToggle = Tabs.Movement:AddToggle("AntiFlingToggle", { Title = "🛡️ Anti Fling (ป้องกันโดนชนลอย)", Default = false })
-    AntiFlingToggle:OnChanged(function(Value)
-        Settings.AntiFling.Enabled = Value
-    end)
-
     Tabs.Movement:AddParagraph({
         Title = "Stamina & Anti-Void",
         Content = "ระบบสตามิน่าไม่จำกัดและกันตกแมพ"
@@ -555,7 +501,7 @@ do
         Content = "พิมพ์ชื่อค้นหา หรือเลือกผู้เล่นเพื่อวาร์ป/ส่องดู"
     })
 
-    local PlayerInput = Tabs.Teleport:AddInput("PlayerSearchInput", {
+    Tabs.Teleport:AddInput("PlayerSearchInput", {
         Title = "🔍 Search Player Name (พิมพ์ชื่อค้นหาผู้เล่น)",
         Default = "",
         Placeholder = "พิมพ์ Username หรือ DisplayName...",
@@ -750,7 +696,7 @@ Window:SelectTab(1)
 
 Fluent:Notify({
     Title = "MyMono x Gemini Hub",
-    Content = "โหลดระบบเรียบร้อย พร้อมใช้งาน!",
+    Content = "กดปุ่ม ALT ขวา เพื่อซ่อน/แสดงเมนู",
     Duration = 5
 })
 
