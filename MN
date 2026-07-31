@@ -9,31 +9,27 @@ local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
+-- ตัวแปรระบบ Save/Teleport และ Spectate
+local savedCFrame = nil
+local SelectedPlayerName = nil
+local Spectating = false
+local PlayerDropdown = nil
+
 -- ==========================================
 -- ⚙️ ค่าตั้งค่าระบบหลัก (Settings)
 -- ==========================================
 local Settings = {
-    LocalHUD = {
-        Enabled = true
+    LocalHUD = { Enabled = true },
+    ESP = { 
+        Enabled = false, 
+        MaxDistance = 500, 
+        MaxStamina = 100,
+        FillColor = Color3.fromRGB(46, 204, 113),
+        OutlineColor = Color3.fromRGB(255, 255, 255)
     },
-    ESP = {
-        Enabled = false,
-        MaxDistance = 500,
-        MaxStamina = 100
-    },
-    InfStamina = {
-        Enabled = false,
-        MaxStamina = 100
-    },
-    AntiVoid = {
-        Enabled = false,
-        VoidYLimit = -50,
-        BounceForce = 150,
-        UseTeleportBack = true
-    },
-    AntiBlur = {
-        Enabled = false
-    }
+    InfStamina = { Enabled = false, MaxStamina = 100 },
+    AntiVoid = { Enabled = false, VoidYLimit = -50, BounceForce = 150, UseTeleportBack = true },
+    AntiBlur = { Enabled = false }
 }
 
 -- ==========================================
@@ -158,7 +154,7 @@ RunService.Heartbeat:Connect(function()
 end)
 
 -- ==========================================
--- 🔄 4. ระบบ Overhead Player ESP (Dynamic Fix)
+-- 🔄 4. ระบบ Overhead Player ESP (Dynamic Auto-Tracking)
 -- ==========================================
 local ESPCache = {}
 
@@ -181,9 +177,9 @@ local function setupESP(player, character)
     local highlight = Instance.new("Highlight")
     highlight.Name = "StatusESP_Highlight"
     highlight.Adornee = character
-    highlight.FillColor = Color3.fromRGB(46, 204, 113)
+    highlight.FillColor = Settings.ESP.FillColor
     highlight.FillTransparency = 0.6
-    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.OutlineColor = Settings.ESP.OutlineColor
     highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     highlight.Parent = character
 
@@ -274,9 +270,9 @@ end
 
 Players.PlayerRemoving:Connect(cleanupESP)
 
--- Loop Real-time ควบคุมทั้ง Local HUD และ Player ESP
+-- Loop Real-time ควบคุมระบบต่างๆ
 RunService.RenderStepped:Connect(function()
-    -- 4.1 อัปเดต HUD ของตัวเราเอง
+    -- 4.1 อัปเดต HUD ของตัวเอง
     if Settings.LocalHUD.Enabled then
         local myChar = LocalPlayer.Character
         if myChar then
@@ -316,7 +312,6 @@ RunService.RenderStepped:Connect(function()
                 if char and char.Parent and hum and hum.Health > 0 and targetRoot then
                     local cache = ESPCache[player]
 
-                    -- ตรวจจับผู้เล่นเกิดใหม่หรือเพิ่งเข้าห้อง
                     if not cache or cache.Character ~= char then
                         setupESP(player, char)
                         cache = ESPCache[player]
@@ -342,21 +337,32 @@ RunService.RenderStepped:Connect(function()
                         end
                     end
                 else
-                    -- ถ้าผู้เล่นตาย หรือตัวละครหายไป ให้ล้าง ESP ออกทันที
                     cleanupESP(player)
                 end
             end
         end
     else
-        -- ถ้าปิด ESP ให้ล้าง ESP ของทุกคนทิ้ง
         for player, _ in pairs(ESPCache) do
             cleanupESP(player)
+        end
+    end
+
+    -- 4.3 Spectate Camera Lock
+    if Spectating then
+        local camera = Workspace.CurrentCamera
+        local targetPlayer = SelectedPlayerName and Players:FindFirstChild(SelectedPlayerName)
+        local targetHum = targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("Humanoid")
+        if targetHum and targetHum.Health > 0 then
+            camera.CameraSubject = targetHum
+        else
+            local myHum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
+            if myHum then camera.CameraSubject = myHum end
         end
     end
 end)
 
 -- ==========================================
--- 🔄 5. ระบบ Anti-Blur (ลบเอฟเฟกต์เบลอ)
+-- 🔄 5. ระบบ Anti-Blur
 -- ==========================================
 local function removeBlurEffects()
     for _, v in ipairs(Lighting:GetDescendants()) do
@@ -381,6 +387,51 @@ Workspace.DescendantAdded:Connect(function(child)
     end
 end)
 
+-- ฟังก์ชันดึงรายชื่อผู้เล่นเพื่ออัปเดต Dropdown
+local function getPlayerNames()
+    local names = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            table.insert(names, p.Name)
+        end
+    end
+    if #names == 0 then table.insert(names, "No Players") end
+    return names
+end
+
+local function refreshPlayerDropdown()
+    if PlayerDropdown then
+        PlayerDropdown:Refresh(getPlayerNames())
+    end
+end
+
+Players.PlayerAdded:Connect(refreshPlayerDropdown)
+Players.PlayerRemoving:Connect(refreshPlayerDropdown)
+
+-- ฟังก์ชันวาร์ปกลางไปตำแหน่งที่บันทึก
+local function teleportToSaved()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root then
+        if savedCFrame then
+            root.CFrame = savedCFrame
+            Rayfield:Notify({
+                Title = "Teleported!",
+                Content = "วาร์ปไปยังตำแหน่งที่บันทึกไว้เรียบร้อยแล้ว",
+                Duration = 2,
+                Image = 4483362458,
+            })
+        else
+            Rayfield:Notify({
+                Title = "Warning",
+                Content = "คุณยังไม่ได้บันทึกตำแหน่ง!",
+                Duration = 2,
+                Image = 4483362458,
+            })
+        end
+    end
+end
+
 -- ==========================================
 -- 🎨 สร้างหน้าต่าง Rayfield GUI
 -- ==========================================
@@ -388,9 +439,7 @@ local Window = Rayfield:CreateWindow({
    Name = "MyMono x Gemini Hub",
    LoadingTitle = "Rayfield Interface Suite",
    LoadingSubtitle = "by MyMono x Gemini",
-   ConfigurationSaving = {
-      Enabled = false,
-   },
+   ConfigurationSaving = { Enabled = false },
    Discord = { Enabled = false },
    KeySystem = false
 })
@@ -406,6 +455,107 @@ MainTab:CreateToggle({
     Callback = function(Value)
         Settings.LocalHUD.Enabled = Value
     end
+})
+
+MainTab:CreateSection("Target Player Options (ส่อง/วาร์ปไปหาผู้เล่น)")
+PlayerDropdown = MainTab:CreateDropdown({
+    Name = "Select Player (เลือกผู้เล่น)",
+    Options = getPlayerNames(),
+    CurrentOption = {"No Players"},
+    MultipleOptions = false,
+    Flag = "PlayerTargetDropdown",
+    Callback = function(Option)
+        SelectedPlayerName = type(Option) == "table" and Option[1] or Option
+    end,
+})
+
+MainTab:CreateButton({
+    Name = "🌀 Teleport to Selected Player (วาร์ปไปหาผู้เล่นที่เลือก)",
+    Callback = function()
+        if SelectedPlayerName and SelectedPlayerName ~= "No Players" then
+            local targetPlayer = Players:FindFirstChild(SelectedPlayerName)
+            local targetRoot = targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+            local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+
+            if targetRoot and myRoot then
+                myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 3)
+                Rayfield:Notify({
+                    Title = "Teleported!",
+                    Content = "วาร์ปไปหา " .. SelectedPlayerName .. " แล้ว",
+                    Duration = 2,
+                    Image = 4483362458,
+                })
+            else
+                Rayfield:Notify({
+                    Title = "Error",
+                    Content = "ไม่พบตัวละครของผู้เล่นนี้!",
+                    Duration = 2,
+                    Image = 4483362458,
+                })
+            end
+        else
+            Rayfield:Notify({
+                Title = "Warning",
+                Content = "กรุณาเลือกผู้เล่นจากรายการก่อน!",
+                Duration = 2,
+                Image = 4483362458,
+            })
+        end
+    end,
+})
+
+MainTab:CreateToggle({
+    Name = "👁️ Spectate Selected Player (ส่องดูผู้เล่นที่เลือก)",
+    CurrentValue = false,
+    Flag = "SpectateToggle",
+    Callback = function(Value)
+        Spectating = Value
+        if not Value then
+            local camera = Workspace.CurrentCamera
+            local myHum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
+            if myHum then camera.CameraSubject = myHum end
+        end
+    end
+})
+
+MainTab:CreateSection("Position & Teleport (ระบบวาร์ปตำแหน่งส่วนตัว)")
+MainTab:CreateButton({
+    Name = "📍 Save Current Position (บันทึกตำแหน่งปัจจุบัน)",
+    Callback = function()
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            savedCFrame = root.CFrame
+            Rayfield:Notify({
+                Title = "Position Saved!",
+                Content = string.format("บันทึกพิกัดสำเร็จ: X:%.1f, Y:%.1f, Z:%.1f", root.Position.X, root.Position.Y, root.Position.Z),
+                Duration = 3,
+                Image = 4483362458,
+            })
+        else
+            Rayfield:Notify({
+                Title = "Error",
+                Content = "ไม่พบตัวละครของคุณ!",
+                Duration = 3,
+                Image = 4483362458,
+            })
+        end
+    end,
+})
+
+MainTab:CreateButton({
+    Name = "🌀 Teleport to Saved Position (วาร์ปไปตำแหน่งที่บันทึก)",
+    Callback = teleportToSaved
+})
+
+MainTab:CreateKeybind({
+    Name = "⌨️ Teleport Keybind (ตั้งค่าปุ่มกดวาร์ปกลับ)",
+    CurrentKeybind = "E",
+    Hold = false,
+    Flag = "TPKeybind",
+    Callback = function()
+        teleportToSaved()
+    end,
 })
 
 MainTab:CreateSection("Stamina System")
@@ -471,6 +621,35 @@ VisualTab:CreateSlider({
     Flag = "ESPDistanceSlider",
     Callback = function(Value)
         Settings.ESP.MaxDistance = Value
+    end
+})
+
+VisualTab:CreateSection("ESP Color Customization (ปรับแต่งสี ESP)")
+VisualTab:CreateColorPicker({
+    Name = "ESP Fill Color (สีออร่า ESP)",
+    Color = Color3.fromRGB(46, 204, 113),
+    Flag = "ESPFillColor",
+    Callback = function(Value)
+        Settings.ESP.FillColor = Value
+        for _, cache in pairs(ESPCache) do
+            if cache.Highlight then
+                cache.Highlight.FillColor = Value
+            end
+        end
+    end
+})
+
+VisualTab:CreateColorPicker({
+    Name = "ESP Outline Color (สีเส้นขอบ ESP)",
+    Color = Color3.fromRGB(255, 255, 255),
+    Flag = "ESPOutlineColor",
+    Callback = function(Value)
+        Settings.ESP.OutlineColor = Value
+        for _, cache in pairs(ESPCache) do
+            if cache.Highlight then
+                cache.Highlight.OutlineColor = Value
+            end
+        end
     end
 })
 
