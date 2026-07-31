@@ -1,29 +1,6 @@
 -- ==========================================
 -- 🚀 Fluent Hub Solution (MyMono x Gemini)
--- ⚡ Performance & Auto-Cleanup Edition
 -- ==========================================
-
--- 🧹 1. ระบบ Auto-Cleanup (ล้างสคริปต์เก่าที่รันค้างไว้)
-if getgenv().MyMonoHub_Connections then
-    for _, conn in pairs(getgenv().MyMonoHub_Connections) do
-        if conn and conn.Connected then conn:Disconnect() end
-    end
-end
-getgenv().MyMonoHub_Connections = {}
-
-if game:GetService("CoreGui"):FindFirstChild("MyMono_SelfHUD") then
-    game:GetService("CoreGui").MyMono_SelfHUD:Destroy()
-end
-if game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("MyMono_SelfHUD") then
-    game:GetService("Players").LocalPlayer.PlayerGui.MyMono_SelfHUD:Destroy()
-end
-
-local function trackConnection(conn)
-    table.insert(getgenv().MyMonoHub_Connections, conn)
-    return conn
-end
-
--- 📦 โหลด Library
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
 local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
@@ -34,14 +11,15 @@ local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
--- ตัวแปรระบบ
+-- ตัวแปรระบบ Save/Teleport และ Spectate
 local savedCFrame = nil
 local SelectedPlayerName = nil
-local TargetInputName = ""
 local Spectating = false
 local PlayerDropdown = nil
 
--- ⚙️ Settings
+-- ==========================================
+-- ⚙️ ค่าตั้งค่าระบบหลัก (Settings)
+-- ==========================================
 local Settings = {
     LocalHUD = { Enabled = true },
     ESP = { 
@@ -56,25 +34,30 @@ local Settings = {
     AntiBlur = { Enabled = false }
 }
 
--- 🏗️ สร้างหน้าต่าง Fluent GUI
+-- ==========================================
+-- 🏗️ สร้างหน้าต่างหลัก Fluent GUI
+-- ==========================================
 local Window = Fluent:CreateWindow({
     Title = "MyMono x Gemini Hub",
-    SubTitle = "Super Optimized",
+    SubTitle = "Fluent Edition",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
-    Acrylic = false, -- ปิด Acrylic เพื่อเพิ่ม FPS
+    Acrylic = true,
     Theme = "Dark",
-    MinimizeKey = Enum.KeyCode.RightAlt
+    MinimizeKey = Enum.KeyCode.LeftControl
 })
 
 local Tabs = {
-    Movement = Window:AddTab({ Title = "Movement", Icon = "activity" }),
-    Teleport = Window:AddTab({ Title = "Teleportation", Icon = "map-pin" }),
+    Main = Window:AddTab({ Title = "Player Features", Icon = "user" }),
     Visuals = Window:AddTab({ Title = "ESP & Visuals", Icon = "eye" }),
     Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
 }
 
--- 🎨 Self HUD UI
+local Options = Fluent.Options
+
+-- ==========================================
+-- 🎨 1. UI หลอดเลือด/สตามิน่า ตัวเราเอง (Bottom HUD)
+-- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "MyMono_SelfHUD"
 screenGui.ResetOnSpawn = false
@@ -90,6 +73,7 @@ myHudFrame.BackgroundTransparency = 0.2
 myHudFrame.Parent = screenGui
 Instance.new("UICorner", myHudFrame).CornerRadius = UDim.new(0, 10)
 
+-- หลอด HP ตัวเรา
 local myHpBg = Instance.new("Frame")
 myHpBg.Size = UDim2.new(0.92, 0, 0, 20)
 myHpBg.Position = UDim2.new(0.04, 0, 0.13, 0)
@@ -112,6 +96,7 @@ myHpText.Font = Enum.Font.SourceSansBold
 myHpText.TextSize = 13
 myHpText.Parent = myHpBg
 
+-- หลอด Stamina ตัวเรา
 local myStBg = Instance.new("Frame")
 myStBg.Size = UDim2.new(0.92, 0, 0, 20)
 myStBg.Position = UDim2.new(0.04, 0, 0.53, 0)
@@ -134,17 +119,22 @@ myStText.Font = Enum.Font.SourceSansBold
 myStText.TextSize = 13
 myStText.Parent = myStBg
 
--- 🔄 Anti-Void System
+-- ==========================================
+-- 🔄 2. ระบบ Anti-Void (กันตกแมพ)
+-- ==========================================
 local lastSafeCFrame = nil
-trackConnection(RunService.Heartbeat:Connect(function()
+RunService.Heartbeat:Connect(function()
     if not Settings.AntiVoid.Enabled then return end
+
     local character = LocalPlayer.Character
     if not character then return end
+
     local root = character:FindFirstChild("HumanoidRootPart")
     local humanoid = character:FindFirstChild("Humanoid")
 
     if root and humanoid and humanoid.Health > 0 then
         local currentY = root.Position.Y
+
         if currentY > (Settings.AntiVoid.VoidYLimit + 20) and humanoid.FloorMaterial ~= Enum.Material.Air then
             lastSafeCFrame = root.CFrame
         end
@@ -152,6 +142,7 @@ trackConnection(RunService.Heartbeat:Connect(function()
         if currentY <= Settings.AntiVoid.VoidYLimit then
             root.AssemblyLinearVelocity = Vector3.zero
             root.AssemblyAngularVelocity = Vector3.zero
+
             if Settings.AntiVoid.UseTeleportBack and lastSafeCFrame then
                 root.CFrame = lastSafeCFrame + Vector3.new(0, 3, 0)
             else
@@ -159,23 +150,35 @@ trackConnection(RunService.Heartbeat:Connect(function()
             end
         end
     end
-end))
+end)
 
--- 🔄 Infinite Stamina System
-trackConnection(RunService.Heartbeat:Connect(function()
+-- ==========================================
+-- 🔄 3. ระบบ Infinite Stamina (สตามิน่าไม่จำกัด)
+-- ==========================================
+RunService.Heartbeat:Connect(function()
     if not Settings.InfStamina.Enabled then return end
+
     local char = LocalPlayer.Character
     if not char then return end
 
-    local staminaVal = char:FindFirstChild("Stamina") or char:FindFirstChild("StaminaValue") or LocalPlayer:FindFirstChild("Stamina")
+    local staminaVal = char:FindFirstChild("Stamina") 
+        or char:FindFirstChild("StaminaValue") 
+        or char:FindFirstChild("Energy") 
+        or LocalPlayer:FindFirstChild("Stamina")
+        or LocalPlayer:FindFirstChild("StaminaValue")
+
     if staminaVal and (staminaVal:IsA("NumberValue") or staminaVal:IsA("IntValue")) then
         staminaVal.Value = Settings.InfStamina.MaxStamina
     end
 
     if char:GetAttribute("Stamina") ~= nil then char:SetAttribute("Stamina", Settings.InfStamina.MaxStamina) end
-end))
+    if char:GetAttribute("Energy") ~= nil then char:SetAttribute("Energy", Settings.InfStamina.MaxStamina) end
+    if LocalPlayer:GetAttribute("Stamina") ~= nil then LocalPlayer:SetAttribute("Stamina", Settings.InfStamina.MaxStamina) end
+end)
 
--- 🔄 Dynamic Overhead ESP System
+-- ==========================================
+-- 🔄 4. ระบบ Overhead Player ESP (Dynamic Auto-Tracking)
+-- ==========================================
 local ESPCache = {}
 
 local function cleanupESP(player)
@@ -189,6 +192,7 @@ end
 
 local function setupESP(player, character)
     cleanupESP(player)
+
     local targetPart = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
     local humanoid = character:FindFirstChild("Humanoid")
     if not targetPart or not humanoid then return end
@@ -220,6 +224,7 @@ local function setupESP(player, character)
     nameLabel.BackgroundTransparency = 1
     nameLabel.Text = player.DisplayName
     nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    nameLabel.TextStrokeTransparency = 0
     nameLabel.Font = Enum.Font.SourceSansBold
     nameLabel.TextSize = 13
     nameLabel.Parent = container
@@ -244,6 +249,7 @@ local function setupESP(player, character)
     hpText.BackgroundTransparency = 1
     hpText.Text = "HP: 100/100"
     hpText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    hpText.TextStrokeTransparency = 0.5
     hpText.Font = Enum.Font.SourceSansBold
     hpText.TextSize = 11
     hpText.Parent = hpBg
@@ -268,6 +274,7 @@ local function setupESP(player, character)
     stText.BackgroundTransparency = 1
     stText.Text = "ST: 100"
     stText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    stText.TextStrokeTransparency = 0.5
     stText.Font = Enum.Font.SourceSansBold
     stText.TextSize = 11
     stText.Parent = stBg
@@ -284,22 +291,18 @@ local function setupESP(player, character)
     }
 end
 
-trackConnection(Players.PlayerRemoving:Connect(cleanupESP))
+Players.PlayerRemoving:Connect(cleanupESP)
 
--- ⚡ Optimized UI Update Loop (อัปเดต 20 ครั้งต่อวินาที ช่วยประหยัด CPU ได้มาก)
-local lastUpdate = 0
-trackConnection(RunService.Heartbeat:Connect(function(dt)
-    lastUpdate = lastUpdate + dt
-    if lastUpdate < 0.05 then return end -- ควบคุมรอบการทำงาน
-    lastUpdate = 0
-
-    -- 1. อัปเดต HUD ของตัวเอง
+-- Loop Real-time ควบคุมระบบต่าง ๆ
+RunService.RenderStepped:Connect(function()
+    -- 4.1 อัปเดต HUD ของตัวเอง
     if Settings.LocalHUD.Enabled then
         local myChar = LocalPlayer.Character
         if myChar then
             local myHum = myChar:FindFirstChild("Humanoid")
             if myHum and myHum.Health > 0 then
                 myHudFrame.Visible = true
+                
                 local hpPct = math.clamp(myHum.Health / myHum.MaxHealth, 0, 1)
                 myHpFill.Size = UDim2.new(hpPct, 0, 1, 0)
                 myHpText.Text = string.format("❤️ HP: %d / %d", math.floor(myHum.Health), math.floor(myHum.MaxHealth))
@@ -318,7 +321,7 @@ trackConnection(RunService.Heartbeat:Connect(function(dt)
         myHudFrame.Visible = false
     end
 
-    -- 2. ESP Loop
+    -- 4.2 Dynamic ESP Loop
     local myChar = LocalPlayer.Character
     local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
 
@@ -331,6 +334,7 @@ trackConnection(RunService.Heartbeat:Connect(function(dt)
 
                 if char and char.Parent and hum and hum.Health > 0 and targetRoot then
                     local cache = ESPCache[player]
+
                     if not cache or cache.Character ~= char then
                         setupESP(player, char)
                         cache = ESPCache[player]
@@ -365,13 +369,11 @@ trackConnection(RunService.Heartbeat:Connect(function(dt)
             cleanupESP(player)
         end
     end
-end))
 
--- Spectate Camera Loop
-trackConnection(RunService.RenderStepped:Connect(function()
+    -- 4.3 Spectate Camera Lock
     if Spectating then
         local camera = Workspace.CurrentCamera
-        local targetPlayer = getTargetPlayer()
+        local targetPlayer = SelectedPlayerName and Players:FindFirstChild(SelectedPlayerName)
         local targetHum = targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("Humanoid")
         if targetHum and targetHum.Health > 0 then
             camera.CameraSubject = targetHum
@@ -380,110 +382,144 @@ trackConnection(RunService.RenderStepped:Connect(function()
             if myHum then camera.CameraSubject = myHum end
         end
     end
-end))
+end)
 
--- Helper Functions
+-- ==========================================
+-- 🔄 5. ระบบ Anti-Blur
+-- ==========================================
 local function removeBlurEffects()
     for _, v in ipairs(Lighting:GetDescendants()) do
         if v:IsA("BlurEffect") or v:IsA("DepthOfFieldEffect") then v:Destroy() end
     end
+    for _, v in ipairs(Workspace:GetDescendants()) do
+        if v:IsA("BlurEffect") or v:IsA("DepthOfFieldEffect") then v:Destroy() end
+    end
 end
 
-function getTargetPlayer()
-    if TargetInputName ~= "" then
-        local searchStr = string.lower(TargetInputName)
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer then
-                if string.find(string.lower(p.Name), searchStr) or string.find(string.lower(p.DisplayName), searchStr) then
-                    return p
-                end
-            end
-        end
+Lighting.DescendantAdded:Connect(function(child)
+    if Settings.AntiBlur.Enabled and (child:IsA("BlurEffect") or child:IsA("DepthOfFieldEffect")) then
+        task.wait()
+        child:Destroy()
     end
-    if SelectedPlayerName and SelectedPlayerName ~= "No Players" then
-        return Players:FindFirstChild(SelectedPlayerName)
-    end
-    return nil
-end
+end)
 
+Workspace.DescendantAdded:Connect(function(child)
+    if Settings.AntiBlur.Enabled and (child:IsA("BlurEffect") or child:IsA("DepthOfFieldEffect")) then
+        task.wait()
+        child:Destroy()
+    end
+end)
+
+-- ฟังก์ชันดึงรายชื่อผู้เล่นเพื่ออัปเดต Dropdown
 local function getPlayerNames()
     local names = {}
     for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then table.insert(names, p.Name) end
+        if p ~= LocalPlayer then
+            table.insert(names, p.Name)
+        end
     end
     if #names == 0 then table.insert(names, "No Players") end
     return names
 end
 
 local function refreshPlayerDropdown()
-    if PlayerDropdown then PlayerDropdown:SetValues(getPlayerNames()) end
+    if PlayerDropdown then
+        PlayerDropdown:SetValues(getPlayerNames())
+    end
 end
 
-trackConnection(Players.PlayerAdded:Connect(refreshPlayerDropdown))
-trackConnection(Players.PlayerRemoving:Connect(refreshPlayerDropdown))
+Players.PlayerAdded:Connect(refreshPlayerDropdown)
+Players.PlayerRemoving:Connect(refreshPlayerDropdown)
 
+-- ฟังก์ชันวาร์ปกลางไปตำแหน่งที่บันทึก
 local function teleportToSaved()
     local char = LocalPlayer.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if root then
         if savedCFrame then
             root.CFrame = savedCFrame
-            Fluent:Notify({ Title = "Teleported!", Content = "วาร์ปเรียบร้อยแล้ว", Duration = 3 })
+            Fluent:Notify({
+                Title = "Teleported!",
+                Content = "วาร์ปไปยังตำแหน่งที่บันทึกไว้เรียบร้อยแล้ว",
+                Duration = 3
+            })
         else
-            Fluent:Notify({ Title = "Warning", Content = "ยังไม่ได้บันทึกตำแหน่ง!", Duration = 3 })
+            Fluent:Notify({
+                Title = "Warning",
+                Content = "คุณยังไม่ได้บันทึกตำแหน่ง!",
+                Duration = 3
+            })
         end
     end
 end
 
--- 🛠️ UI Components
+-- ==========================================
+-- 🛠️ สร้าง UI Components ใน Fluent
+-- ==========================================
 do
-    Tabs.Movement:AddParagraph({ Title = "Stamina & Anti-Void", Content = "ระบบสตามิน่าไม่จำกัดและกันตกแมพ" })
-
-    local InfStaminaToggle = Tabs.Movement:AddToggle("InfStaminaToggle", { Title = "⚡ Infinite Stamina", Default = false })
-    InfStaminaToggle:OnChanged(function(Value) Settings.InfStamina.Enabled = Value end)
-
-    local AntiVoidToggle = Tabs.Movement:AddToggle("AntiVoidToggle", { Title = "🌀 Enable Anti-Void", Default = false })
-    AntiVoidToggle:OnChanged(function(Value) Settings.AntiVoid.Enabled = Value end)
-
-    local AntiVoidModeToggle = Tabs.Movement:AddToggle("AntiVoidModeToggle", { Title = "Teleport Back Mode", Default = true })
-    AntiVoidModeToggle:OnChanged(function(Value) Settings.AntiVoid.UseTeleportBack = Value end)
-
-    Tabs.Movement:AddSlider("VoidYLimitSlider", {
-        Title = "Void Y Limit",
-        Default = -50, Min = -500, Max = 0, Rounding = 0,
-        Callback = function(Value) Settings.AntiVoid.VoidYLimit = Value end
+    -- --------------------------------------
+    -- TAB 1: Player Features
+    -- --------------------------------------
+    Tabs.Main:AddParagraph({
+        Title = "Self Status HUD",
+        Content = "แสดงหลอดเลือดและสตามิน่าของตัวเองไว้ด้านล่างหน้าจอ"
     })
 
-    Tabs.Teleport:AddParagraph({ Title = "Player Teleport System", Content = "ค้นหาหรือเลือกผู้เล่นเพื่อวาร์ป/ส่องดู" })
+    local SelfHUDToggle = Tabs.Main:AddToggle("SelfHUDToggle", { Title = "Show My HP & Stamina HUD", Default = true })
+    SelfHUDToggle:OnChanged(function(Value)
+        Settings.LocalHUD.Enabled = Value
+    end)
 
-    Tabs.Teleport:AddInput("PlayerSearchInput", {
-        Title = "🔍 Search Player Name",
-        Default = "", Placeholder = "พิมพ์ Username หรือ DisplayName...",
-        Numeric = false, Finished = false,
-        Callback = function(Value) TargetInputName = Value end
+    Tabs.Main:AddParagraph({
+        Title = "Player Target Options",
+        Content = "เลือกผู้เล่น ส่องกล้องดู หรือวาร์ปไปหาทันที"
     })
 
-    PlayerDropdown = Tabs.Teleport:AddDropdown("PlayerTargetDropdown", {
-        Title = "Select Player from List",
-        Values = getPlayerNames(), Multi = false, Default = 1,
+    PlayerDropdown = Tabs.Main:AddDropdown("PlayerTargetDropdown", {
+        Title = "Select Player (เลือกผู้เล่น)",
+        Values = getPlayerNames(),
+        Multi = false,
+        Default = 1,
     })
-    PlayerDropdown:OnChanged(function(Value) SelectedPlayerName = Value end)
 
-    Tabs.Teleport:AddButton({
-        Title = "🌀 Teleport to Targeted Player",
+    PlayerDropdown:OnChanged(function(Value)
+        SelectedPlayerName = Value
+    end)
+
+    Tabs.Main:AddButton({
+        Title = "🌀 Teleport to Selected Player",
+        Description = "วาร์ปไปยืนด้านหลังผู้เล่นที่เลือก",
         Callback = function()
-            local targetPlayer = getTargetPlayer()
-            if targetPlayer then
-                local targetRoot = targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if SelectedPlayerName and SelectedPlayerName ~= "No Players" then
+                local targetPlayer = Players:FindFirstChild(SelectedPlayerName)
+                local targetRoot = targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart")
                 local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+
                 if targetRoot and myRoot then
                     myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 3)
+                    Fluent:Notify({
+                        Title = "Teleported!",
+                        Content = "วาร์ปไปหา " .. SelectedPlayerName .. " แล้ว",
+                        Duration = 3
+                    })
+                else
+                    Fluent:Notify({
+                        Title = "Error",
+                        Content = "ไม่พบตัวละครของผู้เล่นนี้!",
+                        Duration = 3
+                    })
                 end
+            else
+                Fluent:Notify({
+                    Title = "Warning",
+                    Content = "กรุณาเลือกผู้เล่นจากรายการก่อน!",
+                    Duration = 3
+                })
             end
         end
     })
 
-    local SpectateToggle = Tabs.Teleport:AddToggle("SpectateToggle", { Title = "👁️ Spectate Targeted Player", Default = false })
+    local SpectateToggle = Tabs.Main:AddToggle("SpectateToggle", { Title = "👁️ Spectate Selected Player (ส่องดู)", Default = false })
     SpectateToggle:OnChanged(function(Value)
         Spectating = Value
         if not Value then
@@ -493,36 +529,103 @@ do
         end
     end)
 
-    Tabs.Teleport:AddParagraph({ Title = "Personal Position Teleport", Content = "บันทึกพิกัดตำแหน่งส่วนตัว" })
+    Tabs.Main:AddParagraph({
+        Title = "Position & Teleport",
+        Content = "บันทึกจุดที่ยืนอยู่เพื่อวาร์ปกลับมาเมื่อไหร่ก็ได้"
+    })
 
-    Tabs.Teleport:AddButton({
+    Tabs.Main:AddButton({
         Title = "📍 Save Current Position",
+        Description = "บันทึกพิกัดตำแหน่งปัจจุบัน",
         Callback = function()
             local char = LocalPlayer.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
-            if root then savedCFrame = root.CFrame end
+            if root then
+                savedCFrame = root.CFrame
+                Fluent:Notify({
+                    Title = "Position Saved!",
+                    Content = string.format("บันทึกพิกัดสำเร็จ: X:%.1f, Y:%.1f, Z:%.1f", root.Position.X, root.Position.Y, root.Position.Z),
+                    Duration = 4
+                })
+            else
+                Fluent:Notify({
+                    Title = "Error",
+                    Content = "ไม่พบตัวละครของคุณ!",
+                    Duration = 3
+                })
+            end
         end
     })
 
-    Tabs.Teleport:AddButton({ Title = "🌀 Teleport to Saved Position", Callback = teleportToSaved })
-
-    local TPKeybind = Tabs.Teleport:AddKeybind("TPKeybind", { Title = "⌨️ Teleport Keybind", Mode = "Toggle", Default = "E" })
-    TPKeybind:OnClick(teleportToSaved)
-
-    Tabs.Visuals:AddParagraph({ Title = "Self Status HUD", Content = "หลอด HP/Stamina ด้านล่าง" })
-    local SelfHUDToggle = Tabs.Visuals:AddToggle("SelfHUDToggle", { Title = "Show My HP & Stamina HUD", Default = true })
-    SelfHUDToggle:OnChanged(function(Value) Settings.LocalHUD.Enabled = Value end)
-
-    Tabs.Visuals:AddParagraph({ Title = "Overhead Player ESP", Content = "มองทะลุผู้เล่นอื่น" })
-    local ESPToggle = Tabs.Visuals:AddToggle("ESPToggle", { Title = "Enable Player ESP", Default = false })
-    ESPToggle:OnChanged(function(Value) Settings.ESP.Enabled = Value end)
-
-    Tabs.Visuals:AddSlider("ESPDistanceSlider", {
-        Title = "ESP Max Distance", Default = 500, Min = 50, Max = 2000, Rounding = 0,
-        Callback = function(Value) Settings.ESP.MaxDistance = Value end
+    Tabs.Main:AddButton({
+        Title = "🌀 Teleport to Saved Position",
+        Description = "วาร์ปไปยังตำแหน่งที่บันทึกไว้",
+        Callback = teleportToSaved
     })
 
-    local ESPFillColorPicker = Tabs.Visuals:AddColorpicker("ESPFillColor", { Title = "ESP Fill Color", Default = Color3.fromRGB(46, 204, 113) })
+    local TPKeybind = Tabs.Main:AddKeybind("TPKeybind", {
+        Title = "⌨️ Teleport Keybind",
+        Mode = "Toggle",
+        Default = "E",
+    })
+    TPKeybind:OnClick(function()
+        teleportToSaved()
+    end)
+
+    Tabs.Main:AddParagraph({
+        Title = "Stamina & Anti-Void",
+        Content = "ตั้งค่าสตามิน่าไม่จำกัดและกันตกแมพ"
+    })
+
+    local InfStaminaToggle = Tabs.Main:AddToggle("InfStaminaToggle", { Title = "Infinite Stamina (สตามิน่าไม่จำกัด)", Default = false })
+    InfStaminaToggle:OnChanged(function(Value)
+        Settings.InfStamina.Enabled = Value
+    end)
+
+    local AntiVoidToggle = Tabs.Main:AddToggle("AntiVoidToggle", { Title = "Enable Anti-Void (เปิดระบบกันตกแมพ)", Default = false })
+    AntiVoidToggle:OnChanged(function(Value)
+        Settings.AntiVoid.Enabled = Value
+    end)
+
+    local AntiVoidModeToggle = Tabs.Main:AddToggle("AntiVoidModeToggle", { Title = "Teleport Back Mode (วาร์ปกลับจุดปลอดภัย)", Default = true })
+    AntiVoidModeToggle:OnChanged(function(Value)
+        Settings.AntiVoid.UseTeleportBack = Value
+    end)
+
+    local VoidYSlider = Tabs.Main:AddSlider("VoidYLimitSlider", {
+        Title = "Void Y Limit (ระดับ Y ที่ถือว่าตกแมพ)",
+        Default = -50,
+        Min = -500,
+        Max = 0,
+        Rounding = 0,
+        Callback = function(Value)
+            Settings.AntiVoid.VoidYLimit = Value
+        end
+    })
+
+    -- --------------------------------------
+    -- TAB 2: ESP & Visuals
+    -- --------------------------------------
+    local ESPToggle = Tabs.Visuals:AddToggle("ESPToggle", { Title = "Enable Player ESP (เปิดมองคนอื่น)", Default = false })
+    ESPToggle:OnChanged(function(Value)
+        Settings.ESP.Enabled = Value
+    end)
+
+    local ESPDistanceSlider = Tabs.Visuals:AddSlider("ESPDistanceSlider", {
+        Title = "ESP Max Distance (ระยะทางมองเห็น)",
+        Default = 500,
+        Min = 50,
+        Max = 2000,
+        Rounding = 0,
+        Callback = function(Value)
+            Settings.ESP.MaxDistance = Value
+        end
+    })
+
+    local ESPFillColorPicker = Tabs.Visuals:AddColorpicker("ESPFillColor", {
+        Title = "ESP Fill Color (สีออร่า ESP)",
+        Default = Color3.fromRGB(46, 204, 113)
+    })
     ESPFillColorPicker:OnChanged(function()
         Settings.ESP.FillColor = ESPFillColorPicker.Value
         for _, cache in pairs(ESPCache) do
@@ -530,7 +633,10 @@ do
         end
     end)
 
-    local ESPOutlineColorPicker = Tabs.Visuals:AddColorpicker("ESPOutlineColor", { Title = "ESP Outline Color", Default = Color3.fromRGB(255, 255, 255) })
+    local ESPOutlineColorPicker = Tabs.Visuals:AddColorpicker("ESPOutlineColor", {
+        Title = "ESP Outline Color (สีเส้นขอบ ESP)",
+        Default = Color3.fromRGB(255, 255, 255)
+    })
     ESPOutlineColorPicker:OnChanged(function()
         Settings.ESP.OutlineColor = ESPOutlineColorPicker.Value
         for _, cache in pairs(ESPCache) do
@@ -538,21 +644,34 @@ do
         end
     end)
 
-    local AntiBlurToggle = Tabs.Visuals:AddToggle("AntiBlurToggle", { Title = "Anti-Blur / Clear Screen", Default = false })
+    local AntiBlurToggle = Tabs.Visuals:AddToggle("AntiBlurToggle", { Title = "Anti-Blur / Clear Screen (ลบเอฟเฟกต์เบลอ)", Default = false })
     AntiBlurToggle:OnChanged(function(Value)
         Settings.AntiBlur.Enabled = Value
         if Value then removeBlurEffects() end
     end)
 end
 
+-- ==========================================
+-- ⚙️ Addons Configuration (Save & Interface Manager)
+-- ==========================================
 SaveManager:SetLibrary(Fluent)
 InterfaceManager:SetLibrary(Fluent)
+
 SaveManager:IgnoreThemeSettings()
 SaveManager:SetIgnoreIndexes({})
+
 InterfaceManager:SetFolder("MyMonoHub")
 SaveManager:SetFolder("MyMonoHub/game")
+
 InterfaceManager:BuildInterfaceSection(Tabs.Settings)
 SaveManager:BuildConfigSection(Tabs.Settings)
 
 Window:SelectTab(1)
-Fluent:Notify({ Title = "MyMono Hub Cleaned & Optimized!", Content = "ล้างสคริปต์เก่าและปรับแต่งความลื่นเรียบร้อยแล้ว", Duration = 5 })
+
+Fluent:Notify({
+    Title = "MyMono x Gemini Hub",
+    Content = "โหลดสคริปต์เรียบร้อยพร้อมใช้งาน!",
+    Duration = 5
+})
+
+SaveManager:LoadAutoloadConfig()
