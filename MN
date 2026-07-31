@@ -158,19 +158,25 @@ RunService.Heartbeat:Connect(function()
 end)
 
 -- ==========================================
--- 🔄 4. ระบบ Overhead ESP & Local HUD Loop
+-- 🔄 4. ระบบ Overhead Player ESP (Dynamic Fix)
 -- ==========================================
 local ESPCache = {}
 
-local function createESPBar(player, character)
-    if player == LocalPlayer then return end
+local function cleanupESP(player)
+    if ESPCache[player] then
+        local data = ESPCache[player]
+        if data.Highlight then pcall(function() data.Highlight:Destroy() end) end
+        if data.Billboard then pcall(function() data.Billboard:Destroy() end) end
+        ESPCache[player] = nil
+    end
+end
 
-    local head = character:WaitForChild("Head", 5)
-    local humanoid = character:WaitForChild("Humanoid", 5)
-    if not head or not humanoid then return end
+local function setupESP(player, character)
+    cleanupESP(player)
 
-    if head:FindFirstChild("StatusESP_Bar") then head.StatusESP_Bar:Destroy() end
-    if character:FindFirstChild("StatusESP_Highlight") then character.StatusESP_Highlight:Destroy() end
+    local targetPart = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character:FindFirstChild("Humanoid")
+    if not targetPart or not humanoid then return end
 
     local highlight = Instance.new("Highlight")
     highlight.Name = "StatusESP_Highlight"
@@ -183,11 +189,11 @@ local function createESPBar(player, character)
 
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "StatusESP_Bar"
-    billboard.Adornee = head
+    billboard.Adornee = targetPart
     billboard.Size = UDim2.new(0, 140, 0, 65)
     billboard.StudsOffset = Vector3.new(0, 3.2, 0)
     billboard.AlwaysOnTop = true
-    billboard.Parent = head
+    billboard.Parent = targetPart
 
     local container = Instance.new("Frame")
     container.Size = UDim2.new(1, 0, 1, 0)
@@ -266,6 +272,9 @@ local function createESPBar(player, character)
     }
 end
 
+Players.PlayerRemoving:Connect(cleanupESP)
+
+-- Loop Real-time ควบคุมทั้ง Local HUD และ Player ESP
 RunService.RenderStepped:Connect(function()
     -- 4.1 อัปเดต HUD ของตัวเราเอง
     if Settings.LocalHUD.Enabled then
@@ -293,55 +302,58 @@ RunService.RenderStepped:Connect(function()
         myHudFrame.Visible = false
     end
 
-    -- 4.2 อัปเดต ESP บนหัวคนอื่น
+    -- 4.2 Dynamic ESP Loop
     local myChar = LocalPlayer.Character
     local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
 
-    for player, data in pairs(ESPCache) do
-        if data.Character and data.Character.Parent and data.Humanoid and data.Humanoid.Health > 0 then
-            local targetRoot = data.Character:FindFirstChild("HumanoidRootPart")
-            if myRoot and targetRoot and Settings.ESP.Enabled then
-                local distance = (myRoot.Position - targetRoot.Position).Magnitude
-                if distance <= Settings.ESP.MaxDistance then
-                    data.Billboard.Enabled = true
-                    data.Highlight.Enabled = true
+    if Settings.ESP.Enabled then
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                local char = player.Character
+                local hum = char and char:FindFirstChild("Humanoid")
+                local targetRoot = char and char:FindFirstChild("HumanoidRootPart")
 
-                    local hpPct = math.clamp(data.Humanoid.Health / data.Humanoid.MaxHealth, 0, 1)
-                    data.HpFill.Size = UDim2.new(hpPct, 0, 1, 0)
-                    data.HpText.Text = string.format("HP: %d/%d", math.floor(data.Humanoid.Health), math.floor(data.Humanoid.MaxHealth))
+                if char and char.Parent and hum and hum.Health > 0 and targetRoot then
+                    local cache = ESPCache[player]
 
-                    local staminaVal = data.Character:GetAttribute("Stamina") or 0
-                    local stPct = math.clamp(staminaVal / Settings.ESP.MaxStamina, 0, 1)
-                    data.StFill.Size = UDim2.new(stPct, 0, 1, 0)
-                    data.StText.Text = string.format("ST: %d [%dm]", math.floor(staminaVal), math.floor(distance))
+                    -- ตรวจจับผู้เล่นเกิดใหม่หรือเพิ่งเข้าห้อง
+                    if not cache or cache.Character ~= char then
+                        setupESP(player, char)
+                        cache = ESPCache[player]
+                    end
+
+                    if cache then
+                        local distance = myRoot and (myRoot.Position - targetRoot.Position).Magnitude or 0
+                        if distance <= Settings.ESP.MaxDistance then
+                            cache.Billboard.Enabled = true
+                            cache.Highlight.Enabled = true
+
+                            local hpPct = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+                            cache.HpFill.Size = UDim2.new(hpPct, 0, 1, 0)
+                            cache.HpText.Text = string.format("HP: %d/%d", math.floor(hum.Health), math.floor(hum.MaxHealth))
+
+                            local staminaVal = char:GetAttribute("Stamina") or 0
+                            local stPct = math.clamp(staminaVal / Settings.ESP.MaxStamina, 0, 1)
+                            cache.StFill.Size = UDim2.new(stPct, 0, 1, 0)
+                            cache.StText.Text = string.format("ST: %d [%dm]", math.floor(staminaVal), math.floor(distance))
+                        else
+                            cache.Billboard.Enabled = false
+                            cache.Highlight.Enabled = false
+                        end
+                    end
                 else
-                    data.Billboard.Enabled = false
-                    data.Highlight.Enabled = false
+                    -- ถ้าผู้เล่นตาย หรือตัวละครหายไป ให้ล้าง ESP ออกทันที
+                    cleanupESP(player)
                 end
-            else
-                data.Billboard.Enabled = false
-                data.Highlight.Enabled = false
             end
-        else
-            if data.Billboard then data.Billboard:Destroy() end
-            if data.Highlight then data.Highlight:Destroy() end
-            ESPCache[player] = nil
+        end
+    else
+        -- ถ้าปิด ESP ให้ล้าง ESP ของทุกคนทิ้ง
+        for player, _ in pairs(ESPCache) do
+            cleanupESP(player)
         end
     end
 end)
-
-local function onPlayerAdded(player)
-    player.CharacterAdded:Connect(function(character)
-        createESPBar(player, character)
-    end)
-    if player.Character then
-        createESPBar(player, player.Character)
-    end
-end
-
-for _, p in ipairs(Players:GetPlayers()) do onPlayerAdded(p) end
-Players.PlayerAdded:Connect(onPlayerAdded)
-Players.PlayerRemoving:Connect(function(p) ESPCache[p] = nil end)
 
 -- ==========================================
 -- 🔄 5. ระบบ Anti-Blur (ลบเอฟเฟกต์เบลอ)
