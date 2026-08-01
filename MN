@@ -1,9 +1,7 @@
 -- ==========================================
--- 🚀 Fluent Hub Solution (MyMono x Gemini)
+-- 🚀 Rayfield Hub Solution (MyMono x Gemini)
 -- ==========================================
-local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
-local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
-local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -33,27 +31,6 @@ local Settings = {
     AntiVoid = { Enabled = false, VoidYLimit = -50, BounceForce = 150, UseTeleportBack = true },
     AntiBlur = { Enabled = false }
 }
-
--- ==========================================
--- 🏗️ สร้างหน้าต่างหลัก Fluent GUI
--- ==========================================
-local Window = Fluent:CreateWindow({
-    Title = "MyMono x Gemini Hub",
-    SubTitle = "Fluent Edition",
-    TabWidth = 160,
-    Size = UDim2.fromOffset(580, 460),
-    Acrylic = true,
-    Theme = "Dark",
-    MinimizeKey = Enum.KeyCode.LeftControl
-})
-
-local Tabs = {
-    Main = Window:AddTab({ Title = "Player Features", Icon = "user" }),
-    Visuals = Window:AddTab({ Title = "ESP & Visuals", Icon = "eye" }),
-    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
-}
-
-local Options = Fluent.Options
 
 -- ==========================================
 -- 🎨 1. UI หลอดเลือด/สตามิน่า ตัวเราเอง (Bottom HUD)
@@ -293,7 +270,7 @@ end
 
 Players.PlayerRemoving:Connect(cleanupESP)
 
--- Loop Real-time ควบคุมระบบต่าง ๆ
+-- Loop Real-time ควบคุมระบบต่างๆ
 RunService.RenderStepped:Connect(function()
     -- 4.1 อัปเดต HUD ของตัวเอง
     if Settings.LocalHUD.Enabled then
@@ -424,7 +401,7 @@ end
 
 local function refreshPlayerDropdown()
     if PlayerDropdown then
-        PlayerDropdown:SetValues(getPlayerNames())
+        PlayerDropdown:Refresh(getPlayerNames())
     end
 end
 
@@ -438,240 +415,253 @@ local function teleportToSaved()
     if root then
         if savedCFrame then
             root.CFrame = savedCFrame
-            Fluent:Notify({
+            Rayfield:Notify({
                 Title = "Teleported!",
                 Content = "วาร์ปไปยังตำแหน่งที่บันทึกไว้เรียบร้อยแล้ว",
-                Duration = 3
+                Duration = 2,
+                Image = 4483362458,
             })
         else
-            Fluent:Notify({
+            Rayfield:Notify({
                 Title = "Warning",
                 Content = "คุณยังไม่ได้บันทึกตำแหน่ง!",
-                Duration = 3
+                Duration = 2,
+                Image = 4483362458,
             })
         end
     end
 end
 
 -- ==========================================
--- 🛠️ สร้าง UI Components ใน Fluent
+-- 🎨 สร้างหน้าต่าง Rayfield GUI
 -- ==========================================
-do
-    -- --------------------------------------
-    -- TAB 1: Player Features
-    -- --------------------------------------
-    Tabs.Main:AddParagraph({
-        Title = "Self Status HUD",
-        Content = "แสดงหลอดเลือดและสตามิน่าของตัวเองไว้ด้านล่างหน้าจอ"
-    })
+local Window = Rayfield:CreateWindow({
+   Name = "MyMono x Gemini Hub",
+   LoadingTitle = "Rayfield Interface Suite",
+   LoadingSubtitle = "by MyMono x Gemini",
+   ConfigurationSaving = { Enabled = false },
+   Discord = { Enabled = false },
+   KeySystem = false
+})
 
-    local SelfHUDToggle = Tabs.Main:AddToggle("SelfHUDToggle", { Title = "Show My HP & Stamina HUD", Default = true })
-    SelfHUDToggle:OnChanged(function(Value)
+-- 1. แท็บ Player Features
+local MainTab = Window:CreateTab("Player Features", 4483362458)
+
+MainTab:CreateSection("Self Status HUD")
+MainTab:CreateToggle({
+    Name = "Show My HP & Stamina HUD (แสดงหลอด HP/Stamina ของตัวเอง)",
+    CurrentValue = true,
+    Flag = "SelfHUDToggle",
+    Callback = function(Value)
         Settings.LocalHUD.Enabled = Value
-    end)
+    end
+})
 
-    Tabs.Main:AddParagraph({
-        Title = "Player Target Options",
-        Content = "เลือกผู้เล่น ส่องกล้องดู หรือวาร์ปไปหาทันที"
-    })
+MainTab:CreateSection("Target Player Options (ส่อง/วาร์ปไปหาผู้เล่น)")
+PlayerDropdown = MainTab:CreateDropdown({
+    Name = "Select Player (เลือกผู้เล่น)",
+    Options = getPlayerNames(),
+    CurrentOption = {"No Players"},
+    MultipleOptions = false,
+    Flag = "PlayerTargetDropdown",
+    Callback = function(Option)
+        SelectedPlayerName = type(Option) == "table" and Option[1] or Option
+    end,
+})
 
-    PlayerDropdown = Tabs.Main:AddDropdown("PlayerTargetDropdown", {
-        Title = "Select Player (เลือกผู้เล่น)",
-        Values = getPlayerNames(),
-        Multi = false,
-        Default = 1,
-    })
+MainTab:CreateButton({
+    Name = "🌀 Teleport to Selected Player (วาร์ปไปหาผู้เล่นที่เลือก)",
+    Callback = function()
+        if SelectedPlayerName and SelectedPlayerName ~= "No Players" then
+            local targetPlayer = Players:FindFirstChild(SelectedPlayerName)
+            local targetRoot = targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+            local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
 
-    PlayerDropdown:OnChanged(function(Value)
-        SelectedPlayerName = Value
-    end)
-
-    Tabs.Main:AddButton({
-        Title = "🌀 Teleport to Selected Player",
-        Description = "วาร์ปไปยืนด้านหลังผู้เล่นที่เลือก",
-        Callback = function()
-            if SelectedPlayerName and SelectedPlayerName ~= "No Players" then
-                local targetPlayer = Players:FindFirstChild(SelectedPlayerName)
-                local targetRoot = targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-                local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-
-                if targetRoot and myRoot then
-                    myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 3)
-                    Fluent:Notify({
-                        Title = "Teleported!",
-                        Content = "วาร์ปไปหา " .. SelectedPlayerName .. " แล้ว",
-                        Duration = 3
-                    })
-                else
-                    Fluent:Notify({
-                        Title = "Error",
-                        Content = "ไม่พบตัวละครของผู้เล่นนี้!",
-                        Duration = 3
-                    })
-                end
+            if targetRoot and myRoot then
+                myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 3)
+                Rayfield:Notify({
+                    Title = "Teleported!",
+                    Content = "วาร์ปไปหา " .. SelectedPlayerName .. " แล้ว",
+                    Duration = 2,
+                    Image = 4483362458,
+                })
             else
-                Fluent:Notify({
-                    Title = "Warning",
-                    Content = "กรุณาเลือกผู้เล่นจากรายการก่อน!",
-                    Duration = 3
+                Rayfield:Notify({
+                    Title = "Error",
+                    Content = "ไม่พบตัวละครของผู้เล่นนี้!",
+                    Duration = 2,
+                    Image = 4483362458,
                 })
             end
+        else
+            Rayfield:Notify({
+                Title = "Warning",
+                Content = "กรุณาเลือกผู้เล่นจากรายการก่อน!",
+                Duration = 2,
+                Image = 4483362458,
+            })
         end
-    })
+    end,
+})
 
-    local SpectateToggle = Tabs.Main:AddToggle("SpectateToggle", { Title = "👁️ Spectate Selected Player (ส่องดู)", Default = false })
-    SpectateToggle:OnChanged(function(Value)
+MainTab:CreateToggle({
+    Name = "👁️ Spectate Selected Player (ส่องดูผู้เล่นที่เลือก)",
+    CurrentValue = false,
+    Flag = "SpectateToggle",
+    Callback = function(Value)
         Spectating = Value
         if not Value then
             local camera = Workspace.CurrentCamera
             local myHum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
             if myHum then camera.CameraSubject = myHum end
         end
-    end)
-
-    Tabs.Main:AddParagraph({
-        Title = "Position & Teleport",
-        Content = "บันทึกจุดที่ยืนอยู่เพื่อวาร์ปกลับมาเมื่อไหร่ก็ได้"
-    })
-
-    Tabs.Main:AddButton({
-        Title = "📍 Save Current Position",
-        Description = "บันทึกพิกัดตำแหน่งปัจจุบัน",
-        Callback = function()
-            local char = LocalPlayer.Character
-            local root = char and char:FindFirstChild("HumanoidRootPart")
-            if root then
-                savedCFrame = root.CFrame
-                Fluent:Notify({
-                    Title = "Position Saved!",
-                    Content = string.format("บันทึกพิกัดสำเร็จ: X:%.1f, Y:%.1f, Z:%.1f", root.Position.X, root.Position.Y, root.Position.Z),
-                    Duration = 4
-                })
-            else
-                Fluent:Notify({
-                    Title = "Error",
-                    Content = "ไม่พบตัวละครของคุณ!",
-                    Duration = 3
-                })
-            end
-        end
-    })
-
-    Tabs.Main:AddButton({
-        Title = "🌀 Teleport to Saved Position",
-        Description = "วาร์ปไปยังตำแหน่งที่บันทึกไว้",
-        Callback = teleportToSaved
-    })
-
-    local TPKeybind = Tabs.Main:AddKeybind("TPKeybind", {
-        Title = "⌨️ Teleport Keybind",
-        Mode = "Toggle",
-        Default = "E",
-    })
-    TPKeybind:OnClick(function()
-        teleportToSaved()
-    end)
-
-    Tabs.Main:AddParagraph({
-        Title = "Stamina & Anti-Void",
-        Content = "ตั้งค่าสตามิน่าไม่จำกัดและกันตกแมพ"
-    })
-
-    local InfStaminaToggle = Tabs.Main:AddToggle("InfStaminaToggle", { Title = "Infinite Stamina (สตามิน่าไม่จำกัด)", Default = false })
-    InfStaminaToggle:OnChanged(function(Value)
-        Settings.InfStamina.Enabled = Value
-    end)
-
-    local AntiVoidToggle = Tabs.Main:AddToggle("AntiVoidToggle", { Title = "Enable Anti-Void (เปิดระบบกันตกแมพ)", Default = false })
-    AntiVoidToggle:OnChanged(function(Value)
-        Settings.AntiVoid.Enabled = Value
-    end)
-
-    local AntiVoidModeToggle = Tabs.Main:AddToggle("AntiVoidModeToggle", { Title = "Teleport Back Mode (วาร์ปกลับจุดปลอดภัย)", Default = true })
-    AntiVoidModeToggle:OnChanged(function(Value)
-        Settings.AntiVoid.UseTeleportBack = Value
-    end)
-
-    local VoidYSlider = Tabs.Main:AddSlider("VoidYLimitSlider", {
-        Title = "Void Y Limit (ระดับ Y ที่ถือว่าตกแมพ)",
-        Default = -50,
-        Min = -500,
-        Max = 0,
-        Rounding = 0,
-        Callback = function(Value)
-            Settings.AntiVoid.VoidYLimit = Value
-        end
-    })
-
-    -- --------------------------------------
-    -- TAB 2: ESP & Visuals
-    -- --------------------------------------
-    local ESPToggle = Tabs.Visuals:AddToggle("ESPToggle", { Title = "Enable Player ESP (เปิดมองคนอื่น)", Default = false })
-    ESPToggle:OnChanged(function(Value)
-        Settings.ESP.Enabled = Value
-    end)
-
-    local ESPDistanceSlider = Tabs.Visuals:AddSlider("ESPDistanceSlider", {
-        Title = "ESP Max Distance (ระยะทางมองเห็น)",
-        Default = 500,
-        Min = 50,
-        Max = 2000,
-        Rounding = 0,
-        Callback = function(Value)
-            Settings.ESP.MaxDistance = Value
-        end
-    })
-
-    local ESPFillColorPicker = Tabs.Visuals:AddColorpicker("ESPFillColor", {
-        Title = "ESP Fill Color (สีออร่า ESP)",
-        Default = Color3.fromRGB(46, 204, 113)
-    })
-    ESPFillColorPicker:OnChanged(function()
-        Settings.ESP.FillColor = ESPFillColorPicker.Value
-        for _, cache in pairs(ESPCache) do
-            if cache.Highlight then cache.Highlight.FillColor = ESPFillColorPicker.Value end
-        end
-    end)
-
-    local ESPOutlineColorPicker = Tabs.Visuals:AddColorpicker("ESPOutlineColor", {
-        Title = "ESP Outline Color (สีเส้นขอบ ESP)",
-        Default = Color3.fromRGB(255, 255, 255)
-    })
-    ESPOutlineColorPicker:OnChanged(function()
-        Settings.ESP.OutlineColor = ESPOutlineColorPicker.Value
-        for _, cache in pairs(ESPCache) do
-            if cache.Highlight then cache.Highlight.OutlineColor = ESPOutlineColorPicker.Value end
-        end
-    end)
-
-    local AntiBlurToggle = Tabs.Visuals:AddToggle("AntiBlurToggle", { Title = "Anti-Blur / Clear Screen (ลบเอฟเฟกต์เบลอ)", Default = false })
-    AntiBlurToggle:OnChanged(function(Value)
-        Settings.AntiBlur.Enabled = Value
-        if Value then removeBlurEffects() end
-    end)
-end
-
--- ==========================================
--- ⚙️ Addons Configuration (Save & Interface Manager)
--- ==========================================
-SaveManager:SetLibrary(Fluent)
-InterfaceManager:SetLibrary(Fluent)
-
-SaveManager:IgnoreThemeSettings()
-SaveManager:SetIgnoreIndexes({})
-
-InterfaceManager:SetFolder("MyMonoHub")
-SaveManager:SetFolder("MyMonoHub/game")
-
-InterfaceManager:BuildInterfaceSection(Tabs.Settings)
-SaveManager:BuildConfigSection(Tabs.Settings)
-
-Window:SelectTab(1)
-
-Fluent:Notify({
-    Title = "MyMono x Gemini Hub",
-    Content = "โหลดสคริปต์เรียบร้อยพร้อมใช้งาน!",
-    Duration = 5
+    end
 })
 
-SaveManager:LoadAutoloadConfig()
+MainTab:CreateSection("Position & Teleport (ระบบวาร์ปตำแหน่งส่วนตัว)")
+MainTab:CreateButton({
+    Name = "📍 Save Current Position (บันทึกตำแหน่งปัจจุบัน)",
+    Callback = function()
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            savedCFrame = root.CFrame
+            Rayfield:Notify({
+                Title = "Position Saved!",
+                Content = string.format("บันทึกพิกัดสำเร็จ: X:%.1f, Y:%.1f, Z:%.1f", root.Position.X, root.Position.Y, root.Position.Z),
+                Duration = 3,
+                Image = 4483362458,
+            })
+        else
+            Rayfield:Notify({
+                Title = "Error",
+                Content = "ไม่พบตัวละครของคุณ!",
+                Duration = 3,
+                Image = 4483362458,
+            })
+        end
+    end,
+})
+
+MainTab:CreateButton({
+    Name = "🌀 Teleport to Saved Position (วาร์ปไปตำแหน่งที่บันทึก)",
+    Callback = teleportToSaved
+})
+
+MainTab:CreateKeybind({
+    Name = "⌨️ Teleport Keybind (ตั้งค่าปุ่มกดวาร์ปกลับ)",
+    CurrentKeybind = "E",
+    Hold = false,
+    Flag = "TPKeybind",
+    Callback = function()
+        teleportToSaved()
+    end,
+})
+
+MainTab:CreateSection("Stamina System")
+MainTab:CreateToggle({
+    Name = "Infinite Stamina (สตามิน่าไม่จำกัด)",
+    CurrentValue = false,
+    Flag = "InfStaminaToggle",
+    Callback = function(Value)
+        Settings.InfStamina.Enabled = Value
+    end
+})
+
+MainTab:CreateSection("Anti-Void (ระบบกันตกแมพ)")
+MainTab:CreateToggle({
+    Name = "Enable Anti-Void (เปิดระบบกันตกแมพ)",
+    CurrentValue = false,
+    Flag = "AntiVoidToggle",
+    Callback = function(Value)
+        Settings.AntiVoid.Enabled = Value
+    end
+})
+
+MainTab:CreateToggle({
+    Name = "Teleport Back Mode (วาร์ปกลับจุดปลอดภัย)",
+    CurrentValue = true,
+    Flag = "AntiVoidMode",
+    Callback = function(Value)
+        Settings.AntiVoid.UseTeleportBack = Value
+    end
+})
+
+MainTab:CreateSlider({
+    Name = "Void Y Limit (ระดับ Y ที่ถือว่าตกแมพ)",
+    Range = {-500, 0},
+    Increment = 10,
+    Suffix = " Y",
+    CurrentValue = -50,
+    Flag = "VoidYLimitSlider",
+    Callback = function(Value)
+        Settings.AntiVoid.VoidYLimit = Value
+    end
+})
+
+-- 2. แท็บ Visuals & ESP
+local VisualTab = Window:CreateTab("ESP & Visuals", 4483362458)
+
+VisualTab:CreateSection("ESP Player Status")
+VisualTab:CreateToggle({
+    Name = "Enable Player ESP (เปิดมองคนอื่น)",
+    CurrentValue = false,
+    Flag = "ESPToggle",
+    Callback = function(Value)
+        Settings.ESP.Enabled = Value
+    end
+})
+
+VisualTab:CreateSlider({
+    Name = "ESP Max Distance (ระยะทางมองเห็น)",
+    Range = {50, 2000},
+    Increment = 50,
+    Suffix = " studs",
+    CurrentValue = 500,
+    Flag = "ESPDistanceSlider",
+    Callback = function(Value)
+        Settings.ESP.MaxDistance = Value
+    end
+})
+
+VisualTab:CreateSection("ESP Color Customization (ปรับแต่งสี ESP)")
+VisualTab:CreateColorPicker({
+    Name = "ESP Fill Color (สีออร่า ESP)",
+    Color = Color3.fromRGB(46, 204, 113),
+    Flag = "ESPFillColor",
+    Callback = function(Value)
+        Settings.ESP.FillColor = Value
+        for _, cache in pairs(ESPCache) do
+            if cache.Highlight then
+                cache.Highlight.FillColor = Value
+            end
+        end
+    end
+})
+
+VisualTab:CreateColorPicker({
+    Name = "ESP Outline Color (สีเส้นขอบ ESP)",
+    Color = Color3.fromRGB(255, 255, 255),
+    Flag = "ESPOutlineColor",
+    Callback = function(Value)
+        Settings.ESP.OutlineColor = Value
+        for _, cache in pairs(ESPCache) do
+            if cache.Highlight then
+                cache.Highlight.OutlineColor = Value
+            end
+        end
+    end
+})
+
+VisualTab:CreateSection("Environment Effects")
+VisualTab:CreateToggle({
+    Name = "Anti-Blur / Clear Screen (ลบเอฟเฟกต์เบลอ)",
+    CurrentValue = false,
+    Flag = "AntiBlurToggle",
+    Callback = function(Value)
+        Settings.AntiBlur.Enabled = Value
+        if Value then
+            removeBlurEffects()
+        end
+    end
+})
