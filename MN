@@ -1,27 +1,21 @@
 -- ==========================================
--- 🚀 Rayfield Hub Solution (Optimized + Auto Block VIM)
+-- 🚀 Rayfield Hub Solution (MyMono x Gemini - Pro UI Version)
 -- ==========================================
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local Lighting = game:GetService("Lighting")
-local Workspace = game:GetService("Workspace")
-local VirtualInputManager = game:GetService("VirtualInputManager")
+local Players, RunService, Lighting, Workspace = game:GetService("Players"), game:GetService("RunService"), game:GetService("Lighting"), game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
 local savedCFrame, SelectedPlayerName, Spectating, PlayerDropdown = nil, nil, false, nil
 
--- ⚙️ รวมการตั้งค่าทั้งหมด
 local Settings = {
-    Combat = { AutoBlock = false, BlockRange = 15, HoldTime = 0.6 },
     LocalHUD = { Enabled = true },
-    ESP = { Enabled = false, MaxDistance = 500, MaxStamina = 100, FillColor = Color3.fromRGB(46, 204, 113), OutlineColor = Color3.fromRGB(255, 255, 255) },
+    ESP = { Enabled = false, MaxDistance = 500, FillColor = Color3.fromRGB(46, 204, 113), OutlineColor = Color3.fromRGB(255, 255, 255) },
     InfStamina = { Enabled = false, MaxStamina = 100 },
     AntiVoid = { Enabled = false, VoidYLimit = -50, BounceForce = 150, UseTeleportBack = true },
     AntiBlur = { Enabled = false }
 }
 
--- 🛠️ Helper Function สร้าง Instance
+-- Helper Function สร้าง Instance แบบสั้น
 local function make(cls, parent, props)
     local obj = Instance.new(cls)
     for k, v in pairs(props or {}) do obj[k] = v end
@@ -29,142 +23,47 @@ local function make(cls, parent, props)
     return obj
 end
 
--- ==========================================
--- ⚔️ 1. Auto Block / Parry (Event-Based VIM)
--- ==========================================
-local isBlocking = false
-local function performBlock()
-    if isBlocking then return end
-    isBlocking = true
-    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
-    task.wait(Settings.Combat.HoldTime)
-    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
-    task.wait(0.1)
-    isBlocking = false
-end
-
-local function attachSensorToEnemy(enemyPlayer)
-    local function setupAnimator(char)
-        local hum = char:WaitForChild("Humanoid", 5)
-        if hum then
-            local animator = hum:WaitForChild("Animator", 5)
-            if animator then
-                animator.AnimationPlayed:Connect(function(track)
-                    if not Settings.Combat.AutoBlock then return end
-                    local myChar = LocalPlayer.Character
-                    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-                    local enemyRoot = char:FindFirstChild("HumanoidRootPart")
-                    
-                    if myRoot and enemyRoot then
-                        local dist = (myRoot.Position - enemyRoot.Position).Magnitude
-                        if dist <= Settings.Combat.BlockRange then
-                            task.spawn(performBlock)
-                        end
-                    end
-                end)
-            end
-        end
+-- Helper Function ไล่เฉดสีเลือด (สมูท Gradient: เขียว -> เหลือง -> แดง)
+local function getHealthColor(percent)
+    if percent >= 0.5 then
+        return Color3.fromRGB(241, 196, 15):Lerp(Color3.fromRGB(46, 204, 113), (percent - 0.5) * 2)
+    else
+        return Color3.fromRGB(231, 76, 60):Lerp(Color3.fromRGB(241, 196, 15), percent * 2)
     end
-
-    enemyPlayer.CharacterAdded:Connect(setupAnimator)
-    if enemyPlayer.Character then setupAnimator(enemyPlayer.Character) end
 end
-
-for _, player in ipairs(Players:GetPlayers()) do
-    if player ~= LocalPlayer then attachSensorToEnemy(player) end
-end
-Players.PlayerAdded:Connect(function(player) attachSensorToEnemy(player) end)
 
 -- ==========================================
--- 🎨 2. UI Local HUD (ของตัวเอง)[cite: 1]
+-- 🎨 1. UI Local HUD (ของตัวเอง)
 -- ==========================================
 local screenGui = make("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"), {Name = "MyMono_SelfHUD", ResetOnSpawn = false})
 local myHudFrame = make("Frame", screenGui, {Name = "LocalPlayerHUD", Size = UDim2.new(0, 300, 0, 60), Position = UDim2.new(0.5, 0, 1, -20), AnchorPoint = Vector2.new(0.5, 1), BackgroundColor3 = Color3.fromRGB(20, 20, 25), BackgroundTransparency = 0.2})
 make("UICorner", myHudFrame, {CornerRadius = UDim.new(0, 10)})
+make("UIStroke", myHudFrame, {Color = Color3.fromRGB(0, 0, 0), Thickness = 1.5, Transparency = 0.5})
 
-local myHpBg = make("Frame", myHudFrame, {Size = UDim2.new(0.92, 0, 0, 20), Position = UDim2.new(0.04, 0, 0.13, 0), BackgroundColor3 = Color3.fromRGB(40, 40, 40)})
+local myHpBg = make("Frame", myHudFrame, {Size = UDim2.new(0.92, 0, 0, 20), Position = UDim2.new(0.04, 0, 0.13, 0), BackgroundColor3 = Color3.fromRGB(30, 30, 30)})
 make("UICorner", myHpBg, {CornerRadius = UDim.new(0, 5)})
+make("UIStroke", myHpBg, {Color = Color3.fromRGB(0, 0, 0), Thickness = 1.2})
 local myHpFill = make("Frame", myHpBg, {Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = Color3.fromRGB(46, 204, 113)})
 make("UICorner", myHpFill, {CornerRadius = UDim.new(0, 5)})
-local myHpText = make("TextLabel", myHpBg, {Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Text = "❤️ HP: 100 / 100", TextColor3 = Color3.fromRGB(255, 255, 255), Font = Enum.Font.SourceSansBold, TextSize = 13})
+local myHpText = make("TextLabel", myHpBg, {Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Text = "❤️ HP: 100 / 100", TextColor3 = Color3.fromRGB(255, 255, 255), TextStrokeTransparency = 0.3, Font = Enum.Font.GothamBold, TextSize = 13})
 
-local myStBg = make("Frame", myHudFrame, {Size = UDim2.new(0.92, 0, 0, 20), Position = UDim2.new(0.04, 0, 0.53, 0), BackgroundColor3 = Color3.fromRGB(40, 40, 40)})
+local myStBg = make("Frame", myHudFrame, {Size = UDim2.new(0.92, 0, 0, 20), Position = UDim2.new(0.04, 0, 0.53, 0), BackgroundColor3 = Color3.fromRGB(30, 30, 30)})
 make("UICorner", myStBg, {CornerRadius = UDim.new(0, 5)})
+make("UIStroke", myStBg, {Color = Color3.fromRGB(0, 0, 0), Thickness = 1.2})
 local myStFill = make("Frame", myStBg, {Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = Color3.fromRGB(241, 196, 15)})
 make("UICorner", myStFill, {CornerRadius = UDim.new(0, 5)})
-local myStText = make("TextLabel", myStBg, {Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Text = "⚡ STAMINA: 100", TextColor3 = Color3.fromRGB(255, 255, 255), Font = Enum.Font.SourceSansBold, TextSize = 13})
+local myStText = make("TextLabel", myStBg, {Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Text = "⚡ STAMINA: 100", TextColor3 = Color3.fromRGB(255, 255, 255), TextStrokeTransparency = 0.3, Font = Enum.Font.GothamBold, TextSize = 13})
 
 -- ==========================================
--- 🔄 3. Player ESP & Logic Loops[cite: 1]
+-- 🔄 2. Anti-Void & Inf Stamina
 -- ==========================================
-local ESPCache = {}
-local function cleanupESP(player)
-    if ESPCache[player] then pcall(function() ESPCache[player].Highlight:Destroy(); ESPCache[player].Billboard:Destroy() end); ESPCache[player] = nil end
-end
-local function setupESP(player, char)
-    cleanupESP(player)
-    local part, hum = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart"), char:FindFirstChild("Humanoid")
-    if not part or not hum then return end
-    local hl = make("Highlight", char, {Name = "ESP_HL", Adornee = char, FillColor = Settings.ESP.FillColor, FillTransparency = 0.6, OutlineColor = Settings.ESP.OutlineColor, DepthMode = Enum.HighlightDepthMode.AlwaysOnTop})
-    local bb = make("BillboardGui", part, {Name = "ESP_BB", Adornee = part, Size = UDim2.new(0, 140, 0, 65), StudsOffset = Vector3.new(0, 3.2, 0), AlwaysOnTop = true})
-    local con = make("Frame", bb, {Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1})
-    make("TextLabel", con, {Size = UDim2.new(1, 0, 0, 18), BackgroundTransparency = 1, Text = player.DisplayName, TextColor3 = Color3.fromRGB(255, 255, 255), TextStrokeTransparency = 0, Font = Enum.Font.SourceSansBold, TextSize = 13})
-    local hpBg = make("Frame", con, {Size = UDim2.new(1, 0, 0, 14), Position = UDim2.new(0, 0, 0, 20), BackgroundColor3 = Color3.fromRGB(40, 40, 40), BorderSizePixel = 0}); make("UICorner", hpBg, {CornerRadius = UDim.new(0, 4)})
-    local hpFill = make("Frame", hpBg, {Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = Color3.fromRGB(46, 204, 113), BorderSizePixel = 0}); make("UICorner", hpFill, {CornerRadius = UDim.new(0, 4)})
-    local hpTxt = make("TextLabel", hpBg, {Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Text = "HP: 100/100", TextColor3 = Color3.fromRGB(255, 255, 255), TextStrokeTransparency = 0.5, Font = Enum.Font.SourceSansBold, TextSize = 11})
-    ESPCache[player] = {Character = char, Humanoid = hum, Highlight = hl, Billboard = bb, HpFill = hpFill, HpText = hpTxt}
-end
-Players.PlayerRemoving:Connect(cleanupESP)
-
-task.spawn(function()
-    while task.wait(0.05) do
-        local myChar = LocalPlayer.Character
-        local myHum, myRoot = myChar and myChar:FindFirstChild("Humanoid"), myChar and myChar:FindFirstChild("HumanoidRootPart")
-
-        -- Self HUD
-        if Settings.LocalHUD.Enabled and myChar and myHum and myHum.Health > 0 then
-            myHudFrame.Visible = true
-            myHpFill.Size = UDim2.new(math.clamp(myHum.Health / myHum.MaxHealth, 0, 1), 0, 1, 0)
-            myHpText.Text = string.format("❤️ HP: %d / %d", math.floor(myHum.Health), math.floor(myHum.MaxHealth))
-            local stVal = myChar:GetAttribute("Stamina") or 0
-            myStFill.Size = UDim2.new(math.clamp(stVal / Settings.ESP.MaxStamina, 0, 1), 0, 1, 0)
-            myStText.Text = string.format("⚡ STAMINA: %d / %d", math.floor(stVal), Settings.ESP.MaxStamina)
-        else
-            myHudFrame.Visible = false
-        end
-
-        -- ESP
-        if Settings.ESP.Enabled then
-            for _, player in ipairs(Players:GetPlayers()) do
-                if player ~= LocalPlayer then
-                    local char = player.Character
-                    local hum = char and char:FindFirstChild("Humanoid")
-                    local root = char and char:FindFirstChild("HumanoidRootPart")
-                    if char and char.Parent and hum and hum.Health > 0 and root then
-                        local cache = ESPCache[player]
-                        if not cache or cache.Character ~= char then setupESP(player, char); cache = ESPCache[player] end
-                        if cache then
-                            local dist = myRoot and (myRoot.Position - root.Position).Magnitude or 0
-                            if dist <= Settings.ESP.MaxDistance then
-                                cache.Billboard.Enabled, cache.Highlight.Enabled = true, true
-                                cache.HpFill.Size = UDim2.new(math.clamp(hum.Health / hum.MaxHealth, 0, 1), 0, 1, 0)
-                                cache.HpText.Text = string.format("HP: %d/%d", math.floor(hum.Health), math.floor(hum.MaxHealth))
-                            else
-                                cache.Billboard.Enabled, cache.Highlight.Enabled = false, false
-                            end
-                        end
-                    else cleanupESP(player) end
-                end
-            end
-        else for p in pairs(ESPCache) do cleanupESP(p) end end
-    end
-end)
-
--- Anti Void & Stamina
+local lastSafeCFrame = nil
 RunService.Heartbeat:Connect(function()
     local char = LocalPlayer.Character
     if not char then return end
     local root, hum = char:FindFirstChild("HumanoidRootPart"), char:FindFirstChild("Humanoid")
+
+    -- Anti Void
     if Settings.AntiVoid.Enabled and root and hum and hum.Health > 0 then
         local y = root.Position.Y
         if y > (Settings.AntiVoid.VoidYLimit + 20) and hum.FloorMaterial ~= Enum.Material.Air then lastSafeCFrame = root.CFrame end
@@ -174,14 +73,120 @@ RunService.Heartbeat:Connect(function()
             else root.AssemblyLinearVelocity = Vector3.new(0, Settings.AntiVoid.BounceForce, 0) end
         end
     end
+
+    -- Infinite Stamina
     if Settings.InfStamina.Enabled then
-        local st = char:FindFirstChild("Stamina") or char:FindFirstChild("StaminaValue")
-        if st then st.Value = Settings.InfStamina.MaxStamina end
-        if char:GetAttribute("Stamina") then char:SetAttribute("Stamina", Settings.InfStamina.MaxStamina) end
+        local st = char:FindFirstChild("Stamina") or char:FindFirstChild("StaminaValue") or char:FindFirstChild("Energy") or LocalPlayer:FindFirstChild("Stamina")
+        if st and (st:IsA("NumberValue") or st:IsA("IntValue")) then st.Value = Settings.InfStamina.MaxStamina end
+        for _, obj in ipairs({char, LocalPlayer}) do
+            if obj:GetAttribute("Stamina") then obj:SetAttribute("Stamina", Settings.InfStamina.MaxStamina) end
+            if obj:GetAttribute("Energy") then obj:SetAttribute("Energy", Settings.InfStamina.MaxStamina) end
+        end
     end
 end)
 
--- Spectate & Utility
+-- ==========================================
+-- 🔄 3. Player ESP & Overhead UI Setup (No Stamina)
+-- ==========================================
+local ESPCache = {}
+
+local function cleanupESP(player)
+    if ESPCache[player] then
+        pcall(function() ESPCache[player].Highlight:Destroy() end)
+        pcall(function() ESPCache[player].Billboard:Destroy() end)
+        ESPCache[player] = nil
+    end
+end
+
+local function setupESP(player, char)
+    cleanupESP(player)
+    local part, hum = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart"), char:FindFirstChild("Humanoid")
+    if not part or not hum then return end
+
+    local hl = make("Highlight", char, {Name = "ESP_HL", Adornee = char, FillColor = Settings.ESP.FillColor, FillTransparency = 0.6, OutlineColor = Settings.ESP.OutlineColor, DepthMode = Enum.HighlightDepthMode.AlwaysOnTop})
+    -- ปรับขนาด Y จาก 65 เหลือ 40 ให้พอดีกับ 1 หลอด
+    local bb = make("BillboardGui", part, {Name = "ESP_BB", Adornee = part, Size = UDim2.new(0, 140, 0, 40), StudsOffset = Vector3.new(0, 3.2, 0), AlwaysOnTop = true})
+    local con = make("Frame", bb, {Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1})
+    
+    -- Name Text (เตรียมไว้ใส่ระยะทาง)
+    local nameTxt = make("TextLabel", con, {Size = UDim2.new(1, 0, 0, 18), BackgroundTransparency = 1, Text = player.DisplayName, TextColor3 = Color3.fromRGB(255, 255, 255), TextStrokeTransparency = 0.2, TextStrokeColor3 = Color3.fromRGB(0, 0, 0), Font = Enum.Font.GothamBold, TextSize = 13})
+    
+    -- Health Bar
+    local hpBg = make("Frame", con, {Size = UDim2.new(1, 0, 0, 14), Position = UDim2.new(0, 0, 0, 20), BackgroundColor3 = Color3.fromRGB(30, 30, 30), BorderSizePixel = 0})
+    make("UICorner", hpBg, {CornerRadius = UDim.new(0, 4)})
+    make("UIStroke", hpBg, {Color = Color3.fromRGB(0, 0, 0), Thickness = 1.2})
+    local hpFill = make("Frame", hpBg, {Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = Color3.fromRGB(46, 204, 113), BorderSizePixel = 0})
+    make("UICorner", hpFill, {CornerRadius = UDim.new(0, 4)})
+    local hpTxt = make("TextLabel", hpBg, {Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Text = "HP: 100/100", TextColor3 = Color3.fromRGB(255, 255, 255), TextStrokeTransparency = 0.3, TextStrokeColor3 = Color3.fromRGB(0, 0, 0), Font = Enum.Font.GothamBold, TextSize = 11})
+
+    ESPCache[player] = {Character = char, Humanoid = hum, Highlight = hl, Billboard = bb, NameText = nameTxt, HpFill = hpFill, HpText = hpTxt}
+end
+
+Players.PlayerRemoving:Connect(cleanupESP)
+
+-- 🔄 4. Throttled Main Loop (ทำงานทุกๆ 0.05s)
+task.spawn(function()
+    while task.wait(0.05) do
+        local myChar = LocalPlayer.Character
+        local myHum = myChar and myChar:FindFirstChild("Humanoid")
+        local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+
+        -- Update Self HUD (พร้อมระบบเปลี่ยนสี)
+        if Settings.LocalHUD.Enabled and myChar and myHum and myHum.Health > 0 then
+            myHudFrame.Visible = true
+            local myHpPercent = math.clamp(myHum.Health / myHum.MaxHealth, 0, 1)
+            myHpFill.Size = UDim2.new(myHpPercent, 0, 1, 0)
+            myHpFill.BackgroundColor3 = getHealthColor(myHpPercent)
+            myHpText.Text = string.format("❤️ HP: %d / %d", math.floor(myHum.Health), math.floor(myHum.MaxHealth))
+            
+            local stVal = myChar:GetAttribute("Stamina") or 0
+            myStFill.Size = UDim2.new(math.clamp(stVal / Settings.InfStamina.MaxStamina, 0, 1), 0, 1, 0)
+            myStText.Text = string.format("⚡ STAMINA: %d", math.floor(stVal))
+        else
+            myHudFrame.Visible = false
+        end
+
+        -- Update ESP Players (พร้อมระบบเปลี่ยนสีและตัด Stamina ออก)
+        if Settings.ESP.Enabled then
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer then
+                    local char = player.Character
+                    local hum = char and char:FindFirstChild("Humanoid")
+                    local root = char and char:FindFirstChild("HumanoidRootPart")
+
+                    if char and char.Parent and hum and hum.Health > 0 and root then
+                        local cache = ESPCache[player]
+                        if not cache or cache.Character ~= char then setupESP(player, char); cache = ESPCache[player] end
+                        
+                        if cache then
+                            local dist = myRoot and (myRoot.Position - root.Position).Magnitude or 0
+                            if dist <= Settings.ESP.MaxDistance then
+                                cache.Billboard.Enabled, cache.Highlight.Enabled = true, true
+                                
+                                -- อัปเดตชื่อพร้อมระยะทาง
+                                cache.NameText.Text = string.format("%s [%dm]", player.DisplayName, math.floor(dist))
+                                
+                                -- อัปเดตเลือดพร้อมไล่สี
+                                local hpPercent = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+                                cache.HpFill.Size = UDim2.new(hpPercent, 0, 1, 0)
+                                cache.HpFill.BackgroundColor3 = getHealthColor(hpPercent)
+                                cache.HpText.Text = string.format("HP: %d/%d", math.floor(hum.Health), math.floor(hum.MaxHealth))
+                            else
+                                cache.Billboard.Enabled, cache.Highlight.Enabled = false, false
+                            end
+                        end
+                    else
+                        cleanupESP(player)
+                    end
+                end
+            end
+        else
+            for p in pairs(ESPCache) do cleanupESP(p) end
+        end
+    end
+end)
+
+-- Fast Spectate Loop
 RunService.RenderStepped:Connect(function()
     if Spectating then
         local cam = Workspace.CurrentCamera
@@ -192,144 +197,115 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
+-- ==========================================
+-- 🔄 5. Anti-Blur System
+-- ==========================================
 local function clearBlur(child)
-    if Settings.AntiBlur.Enabled and (child:IsA("BlurEffect") or child:IsA("DepthOfFieldEffect")) then task.defer(function() child:Destroy() end) end
+    if Settings.AntiBlur.Enabled and (child:IsA("BlurEffect") or child:IsA("DepthOfFieldEffect")) then
+        task.defer(function() child:Destroy() end)
+    end
 end
-Lighting.DescendantAdded:Connect(clearBlur); Workspace.DescendantAdded:Connect(clearBlur)
+
+Lighting.DescendantAdded:Connect(clearBlur)
+Workspace.DescendantAdded:Connect(clearBlur)
+
+local function getPlayerNames()
+    local names = {}
+    for _, p in ipairs(Players:GetPlayers()) do if p ~= LocalPlayer then table.insert(names, p.Name) end end
+    return #names > 0 and names or {"No Players"}
+end
+
+local function refreshDropdown()
+    if PlayerDropdown then PlayerDropdown:Refresh(getPlayerNames()) end
+end
+Players.PlayerAdded:Connect(refreshDropdown)
+Players.PlayerRemoving:Connect(refreshDropdown)
+
+local function teleportToSaved()
+    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if root and savedCFrame then
+        root.CFrame = savedCFrame
+        Rayfield:Notify({Title = "Teleported!", Content = "วาร์ปเรียบร้อย", Duration = 2})
+    else
+        Rayfield:Notify({Title = "Error", Content = "ยังไม่ได้บันทึกจุด / ไม่พบตัวละคร", Duration = 2})
+    end
+end
 
 -- ==========================================
--- 🎨 4. Rayfield UI Building
+-- 🎨 Rayfield UI Elements Setup
 -- ==========================================
 local Window = Rayfield:CreateWindow({
-   Name = "MyMono Hub V2",
-   LoadingTitle = "Loading System...",
-   LoadingSubtitle = "by MyMono",
+   Name = "MyMono x Gemini Hub",
+   LoadingTitle = "Rayfield Interface Suite",
+   LoadingSubtitle = "by MyMono x Gemini",
    ConfigurationSaving = { Enabled = false },
    Discord = { Enabled = false },
    KeySystem = false
 })
 
--- ⚔️ TAB 1: Combat System
-local CombatTab = Window:CreateTab("Combat System", 4483362458)
-CombatTab:CreateSection("Auto Block / Parry (VIM)")
-CombatTab:CreateToggle({
-    Name = "Enable Auto Block (Beta I SuS)", CurrentValue = false, Flag = "AutoBlockToggle",
-    Callback = function(v) Settings.Combat.AutoBlock = v end
-})
-CombatTab:CreateSlider({
-    Name = "Block Detect Range", Range = {5, 30}, Increment = 1, Suffix = " Studs", CurrentValue = 15, Flag = "BlockRangeSlider",
-    Callback = function(v) Settings.Combat.BlockRange = v end
-})
-CombatTab:CreateSlider({
-    Name = "Block Hold Time", Range = {0.1, 2}, Increment = 0.1, Suffix = " Sec", CurrentValue = 0.6, Flag = "BlockHoldSlider",
-    Callback = function(v) Settings.Combat.HoldTime = v end
+local MainTab = Window:CreateTab("Player Features", 4483362458)
+MainTab:CreateSection("Self Status HUD")
+MainTab:CreateToggle({Name = "Show My HP & Stamina HUD", CurrentValue = true, Flag = "SelfHUDToggle", Callback = function(v) Settings.LocalHUD.Enabled = v end})
+
+MainTab:CreateSection("Target Player Options")
+PlayerDropdown = MainTab:CreateDropdown({Name = "Select Player", Options = getPlayerNames(), CurrentOption = {"No Players"}, MultipleOptions = false, Flag = "PlayerTargetDropdown", Callback = function(opt) SelectedPlayerName = type(opt) == "table" and opt[1] or opt end})
+
+MainTab:CreateButton({
+    Name = "🌀 Teleport to Selected Player",
+    Callback = function()
+        local p = SelectedPlayerName and Players:FindFirstChild(SelectedPlayerName)
+        local tr = p and p.Character and p.Character:FindFirstChild("HumanoidRootPart")
+        local mr = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if tr and mr then mr.CFrame = tr.CFrame * CFrame.new(0, 0, 3)
+        else Rayfield:Notify({Title = "Error", Content = "ไม่พบผู้เล่นนี้", Duration = 2}) end
+    end
 })
 
--- 👤 TAB 2: Local Player
-local PlayerTab = Window:CreateTab("Local Player", 4483362458)
-PlayerTab:CreateSection("Status & HUD")
-PlayerTab:CreateToggle({
-    Name = "Show HP/Stamina HUD", CurrentValue = true, Flag = "SelfHUDToggle",
-    Callback = function(v) Settings.LocalHUD.Enabled = v end
-})
-PlayerTab:CreateToggle({
-    Name = "Infinite Stamina", CurrentValue = false, Flag = "InfStaminaToggle",
-    Callback = function(v) Settings.InfStamina.Enabled = v end
-})
-PlayerTab:CreateSection("Anti-Void Protection")
-PlayerTab:CreateToggle({
-    Name = "Enable Anti-Void", CurrentValue = false, Flag = "AntiVoidToggle",
-    Callback = function(v) Settings.AntiVoid.Enabled = v end
-})
-PlayerTab:CreateToggle({
-    Name = "Teleport Back Mode", CurrentValue = true, Flag = "AntiVoidMode",
-    Callback = function(v) Settings.AntiVoid.UseTeleportBack = v end
+MainTab:CreateToggle({
+    Name = "👁️ Spectate Selected Player", CurrentValue = false, Flag = "SpectateToggle",
+    Callback = function(v)
+        Spectating = v
+        if not v then
+            local myHum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
+            if myHum then Workspace.CurrentCamera.CameraSubject = myHum end
+        end
+    end
 })
 
--- 🎯 TAB 3: Players & Teleport
-local TargetTab = Window:CreateTab("Players & TP", 4483362458)
-TargetTab:CreateSection("Teleport (Self)")
-local function teleportToSaved()
-    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if root and savedCFrame then root.CFrame = savedCFrame; Rayfield:Notify({Title = "Success", Content = "วาร์ปเรียบร้อย", Duration = 2})
-    else Rayfield:Notify({Title = "Error", Content = "ไม่พบจุดเซฟ", Duration = 2}) end
-end
-TargetTab:CreateButton({
+MainTab:CreateSection("Position & Teleport")
+MainTab:CreateButton({
     Name = "📍 Save Current Position",
     Callback = function()
         local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         if root then savedCFrame = root.CFrame; Rayfield:Notify({Title = "Saved!", Content = "บันทึกตำแหน่งเรียบร้อย", Duration = 2}) end
     end
 })
-TargetTab:CreateButton({Name = "🌀 Teleport to Saved Position", Callback = teleportToSaved})
-TargetTab:CreateKeybind({Name = "⌨️ TP Keybind", CurrentKeybind = "E", Hold = false, Flag = "TPKeybind", Callback = teleportToSaved})
+MainTab:CreateButton({Name = "🌀 Teleport to Saved Position", Callback = teleportToSaved})
+MainTab:CreateKeybind({Name = "⌨️ Teleport Keybind", CurrentKeybind = "E", Hold = false, Flag = "TPKeybind", Callback = teleportToSaved})
 
-TargetTab:CreateSection("Target Player")
-local function getPlayerNames()
-    local names = {}
-    for _, p in ipairs(Players:GetPlayers()) do if p ~= LocalPlayer then table.insert(names, p.Name) end end
-    return #names > 0 and names or {"No Players"}
-end
-PlayerDropdown = TargetTab:CreateDropdown({Name = "Select Player", Options = getPlayerNames(), CurrentOption = {"No Players"}, MultipleOptions = false, Flag = "PlayerTarget", Callback = function(opt) SelectedPlayerName = type(opt) == "table" and opt[1] or opt end})
-Players.PlayerAdded:Connect(function() if PlayerDropdown then PlayerDropdown:Refresh(getPlayerNames()) end end)
-Players.PlayerRemoving:Connect(function() if PlayerDropdown then PlayerDropdown:Refresh(getPlayerNames()) end end)
+MainTab:CreateSection("Stamina & Anti-Void")
+MainTab:CreateToggle({Name = "Infinite Stamina", CurrentValue = false, Flag = "InfStaminaToggle", Callback = function(v) Settings.InfStamina.Enabled = v end})
+MainTab:CreateToggle({Name = "Enable Anti-Void", CurrentValue = false, Flag = "AntiVoidToggle", Callback = function(v) Settings.AntiVoid.Enabled = v end})
+MainTab:CreateToggle({Name = "Teleport Back Mode", CurrentValue = true, Flag = "AntiVoidMode", Callback = function(v) Settings.AntiVoid.UseTeleportBack = v end})
+MainTab:CreateSlider({Name = "Void Y Limit", Range = {-500, 0}, Increment = 10, Suffix = " Y", CurrentValue = -50, Flag = "VoidYLimitSlider", Callback = function(v) Settings.AntiVoid.VoidYLimit = v end})
 
-TargetTab:CreateButton({
-    Name = "🌀 Teleport to Target",
-    Callback = function()
-        local p = SelectedPlayerName and Players:FindFirstChild(SelectedPlayerName)
-        local tr = p and p.Character and p.Character:FindFirstChild("HumanoidRootPart")
-        local mr = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if tr and mr then mr.CFrame = tr.CFrame * CFrame.new(0, 0, 3) else Rayfield:Notify({Title = "Error", Content = "ไม่พบผู้เล่น", Duration = 2}) end
-    end
-})
-TargetTab:CreateToggle({
-    Name = "👁️ Spectate Target", CurrentValue = false, Flag = "SpectateToggle",
-    Callback = function(v)
-        Spectating = v
-        if not v then local myHum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid"); if myHum then Workspace.CurrentCamera.CameraSubject = myHum end end
-    end
-})
-
--- 👁️ TAB 4: Visuals & ESP
-local VisualTab = Window:CreateTab("Visuals & ESP", 4483362458)
-VisualTab:CreateSection("Player ESP")
-VisualTab:CreateToggle({
-    Name = "Enable Player ESP", CurrentValue = false, Flag = "ESPToggle",
-    Callback = function(v) Settings.ESP.Enabled = v end
-})
-VisualTab:CreateColorPicker({
-    Name = "ESP Fill Color", 
-    Color = Settings.ESP.FillColor, 
-    Flag = "ESPFillColor",
-    Callback = function(v) 
-        Settings.ESP.FillColor = v
-        -- อัปเดตสีผู้เล่นที่กำลังแสดง ESP อยู่ทันที
-        for _, cache in pairs(ESPCache) do 
-            if cache.Highlight then cache.Highlight.FillColor = v end 
-        end 
-    end
-})
+local VisualTab = Window:CreateTab("ESP & Visuals", 4483362458)
+VisualTab:CreateSection("ESP Player Status")
+VisualTab:CreateToggle({Name = "Enable Player ESP", CurrentValue = false, Flag = "ESPToggle", Callback = function(v) Settings.ESP.Enabled = v end})
+VisualTab:CreateSlider({Name = "ESP Max Distance", Range = {50, 2000}, Increment = 50, Suffix = " studs", CurrentValue = 500, Flag = "ESPDistanceSlider", Callback = function(v) Settings.ESP.MaxDistance = v end})
 
 VisualTab:CreateColorPicker({
-    Name = "ESP Outline Color", 
-    Color = Settings.ESP.OutlineColor, 
-    Flag = "ESPOutlineColor",
-    Callback = function(v) 
-        Settings.ESP.OutlineColor = v
-        -- อัปเดตสีขอบผู้เล่นที่กำลังแสดง ESP อยู่ทันที
-        for _, cache in pairs(ESPCache) do 
-            if cache.Highlight then cache.Highlight.OutlineColor = v end 
-        end 
-    end
+    Name = "ESP Fill Color", Color = Settings.ESP.FillColor, Flag = "ESPFillColor",
+    Callback = function(v) Settings.ESP.FillColor = v; for _, c in pairs(ESPCache) do if c.Highlight then c.Highlight.FillColor = v end end end
 })
-VisualTab:CreateSlider({
-    Name = "ESP Max Distance", Range = {50, 2000}, Increment = 50, Suffix = " studs", CurrentValue = 500, Flag = "ESPDistanceSlider",
-    Callback = function(v) Settings.ESP.MaxDistance = v end
+VisualTab:CreateColorPicker({
+    Name = "ESP Outline Color", Color = Settings.ESP.OutlineColor, Flag = "ESPOutlineColor",
+    Callback = function(v) Settings.ESP.OutlineColor = v; for _, c in pairs(ESPCache) do if c.Highlight then c.Highlight.OutlineColor = v end end end
 })
-VisualTab:CreateSection("Environment")
+
+VisualTab:CreateSection("Environment Effects")
 VisualTab:CreateToggle({
-    Name = "Clear Fog / Anti-Blur", CurrentValue = false, Flag = "AntiBlurToggle",
+    Name = "Anti-Blur / Clear Screen", CurrentValue = false, Flag = "AntiBlurToggle",
     Callback = function(v)
         Settings.AntiBlur.Enabled = v
         if v then
