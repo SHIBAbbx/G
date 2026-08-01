@@ -213,7 +213,7 @@ local Window = Rayfield:CreateWindow({
 local CombatTab = Window:CreateTab("Combat System", 4483362458)
 CombatTab:CreateSection("Auto Block / Parry (VIM)")
 CombatTab:CreateToggle({
-    Name = "Enable Auto Block", CurrentValue = false, Flag = "AutoBlockToggle",
+    Name = "Enable Auto Block (Beta I SuS)", CurrentValue = false, Flag = "AutoBlockToggle",
     Callback = function(v) Settings.Combat.AutoBlock = v end
 })
 CombatTab:CreateSlider({
