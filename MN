@@ -1,11 +1,13 @@
 -- ==========================================
--- 🚀 Rayfield Hub Solution (MyMono x Gemini - Friend ESP Update)
+-- 🚀 Rayfield Hub Solution (MyMono x Gemini - Complete Suite)
 -- ==========================================
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-local Players, RunService, Lighting, Workspace = game:GetService("Players"), game:GetService("RunService"), game:GetService("Lighting"), game:GetService("Workspace")
+local Players, RunService, Lighting, Workspace, VirtualInputManager = 
+    game:GetService("Players"), game:GetService("RunService"), game:GetService("Lighting"), game:GetService("Workspace"), game:GetService("VirtualInputManager")
 local LocalPlayer = Players.LocalPlayer
 
 local savedCFrame, SelectedPlayerName, Spectating, PlayerDropdown = nil, nil, false, nil
+local isBlocking = false
 
 local Settings = {
     LocalHUD = { Enabled = true },
@@ -17,8 +19,9 @@ local Settings = {
         OutlineColor = Color3.fromRGB(255, 255, 255) 
     },
     InfStamina = { Enabled = false, MaxStamina = 100 },
-    AntiVoid = { Enabled = false, VoidYLimit = -50, BounceForce = 150, UseTeleportBack = true },
-    AntiBlur = { Enabled = false }
+    AntiVoid = { Enabled = false, VoidYLimit = -400, BounceForce = 150, UseTeleportBack = true },
+    AntiBlur = { Enabled = false },
+    AutoBlock = { Enabled = true, BlockRange = 15, HoldTime = 0.6 }
 }
 
 -- ==========================================
@@ -43,7 +46,7 @@ end
 local FriendCache = {}
 local function isFriend(player)
     if FriendCache[player] == nil then
-        FriendCache[player] = false -- ตั้งค่าเริ่มต้นกันบั๊ก
+        FriendCache[player] = false
         task.spawn(function()
             pcall(function()
                 FriendCache[player] = LocalPlayer:IsFriendsWith(player.UserId)
@@ -54,11 +57,74 @@ local function isFriend(player)
 end
 
 Players.PlayerRemoving:Connect(function(player)
-    FriendCache[player] = nil -- ลบความจำเมื่อผู้เล่นออก
+    FriendCache[player] = nil
 end)
 
 -- ==========================================
--- 🎨 1. UI Local HUD (ของตัวเอง)
+-- 🛡️ Auto Block / Parry System (VIM)
+-- ==========================================
+local function performBlock()
+    if isBlocking then return end
+    isBlocking = true
+    
+    -- กด F ลงไป
+    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
+    
+    -- ค้างโล่ตามเวลาที่กำหนด
+    task.wait(Settings.AutoBlock.HoldTime)
+    
+    -- ปล่อยปุ่ม F
+    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
+    
+    task.wait(0.1)
+    isBlocking = false
+end
+
+local function attachSensorToEnemy(enemyPlayer)
+    local function bindAnimation(char)
+        local hum = char:WaitForChild("Humanoid", 5)
+        if hum then
+            local animator = hum:WaitForChild("Animator", 5)
+            if animator then
+                animator.AnimationPlayed:Connect(function(track)
+                    if not Settings.AutoBlock.Enabled then return end
+                    
+                    local myChar = LocalPlayer.Character
+                    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+                    local enemyRoot = char:FindFirstChild("HumanoidRootPart")
+                    
+                    if myRoot and enemyRoot then
+                        local dist = (myRoot.Position - enemyRoot.Position).Magnitude
+                        if dist <= Settings.AutoBlock.BlockRange then
+                            task.spawn(performBlock)
+                        end
+                    end
+                end)
+            end
+        end
+    end
+
+    enemyPlayer.CharacterAdded:Connect(bindAnimation)
+    if enemyPlayer.Character then
+        task.spawn(function() bindAnimation(enemyPlayer.Character) end)
+    end
+end
+
+-- ติดตั้งระบบเซนเซอร์ Auto Block
+for _, player in ipairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        attachSensorToEnemy(player)
+    end
+end
+
+Players.PlayerAdded:Connect(function(player)
+    if player ~= LocalPlayer then
+        attachSensorToEnemy(player)
+    end
+end)
+
+-- ==========================================
+-- 🎨 1. UI Local HUD
 -- ==========================================
 local screenGui = make("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"), {Name = "MyMono_SelfHUD", ResetOnSpawn = false})
 local myHudFrame = make("Frame", screenGui, {Name = "LocalPlayerHUD", Size = UDim2.new(0, 300, 0, 60), Position = UDim2.new(0.5, 0, 1, -20), AnchorPoint = Vector2.new(0.5, 1), BackgroundColor3 = Color3.fromRGB(20, 20, 25), BackgroundTransparency = 0.2})
@@ -166,7 +232,7 @@ task.spawn(function()
             myHudFrame.Visible = false
         end
 
-        -- Update ESP Players (พร้อมระบบแยกเพื่อน)
+        -- Update ESP Players
         if Settings.ESP.Enabled then
             for _, player in ipairs(Players:GetPlayers()) do
                 if player ~= LocalPlayer then
@@ -183,18 +249,15 @@ task.spawn(function()
                             if dist <= Settings.ESP.MaxDistance then
                                 cache.Billboard.Enabled, cache.Highlight.Enabled = true, true
                                 
-                                -- ⭐️ ระบบแยกสีเพื่อน
                                 local isFr = isFriend(player)
                                 local targetColor = isFr and Settings.ESP.FriendColor or Settings.ESP.FillColor
                                 
                                 cache.Highlight.FillColor = targetColor
                                 cache.NameText.TextColor3 = isFr and targetColor or Color3.fromRGB(255, 255, 255)
                                 
-                                -- ใส่รูปดาว ⭐️ หน้าชื่อถ้าเป็นเพื่อน
                                 local prefix = isFr and "⭐️ " or ""
                                 cache.NameText.Text = string.format("%s%s [%dm]", prefix, player.DisplayName, math.floor(dist))
                                 
-                                -- อัปเดตเลือด
                                 local hpPercent = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
                                 cache.HpFill.Size = UDim2.new(hpPercent, 0, 1, 0)
                                 cache.HpFill.BackgroundColor3 = getHealthColor(hpPercent)
@@ -269,6 +332,14 @@ local Window = Rayfield:CreateWindow({
    KeySystem = false
 })
 
+-- ⚔️ Combat & Defense Tab
+local CombatTab = Window:CreateTab("Combat & Defense", 4483362458)
+CombatTab:CreateSection("Auto Block / Parry Settings")
+CombatTab:CreateToggle({Name = "Enable Auto Block (555 อดีตเบต้าเทสเตอร์งั้นเหรอ)", CurrentValue = Settings.AutoBlock.Enabled, Flag = "AutoBlockToggle", Callback = function(v) Settings.AutoBlock.Enabled = v end})
+CombatTab:CreateSlider({Name = "Block Range", Range = {5, 50}, Increment = 1, Suffix = " studs", CurrentValue = Settings.AutoBlock.BlockRange, Flag = "BlockRangeSlider", Callback = function(v) Settings.AutoBlock.BlockRange = v end})
+CombatTab:CreateSlider({Name = "Hold Time", Range = {0.1, 2}, Increment = 0.1, Suffix = " s", CurrentValue = Settings.AutoBlock.HoldTime, Flag = "HoldTimeSlider", Callback = function(v) Settings.AutoBlock.HoldTime = v end})
+
+-- 👤 Player Features Tab
 local MainTab = Window:CreateTab("Player Features", 4483362458)
 MainTab:CreateSection("Self Status HUD")
 MainTab:CreateToggle({Name = "Show My HP & Stamina HUD", CurrentValue = true, Flag = "SelfHUDToggle", Callback = function(v) Settings.LocalHUD.Enabled = v end})
@@ -302,6 +373,7 @@ MainTab:CreateToggle({Name = "Enable Anti-Void", CurrentValue = false, Flag = "A
 MainTab:CreateToggle({Name = "Teleport Back Mode", CurrentValue = true, Flag = "AntiVoidMode", Callback = function(v) Settings.AntiVoid.UseTeleportBack = v end})
 MainTab:CreateSlider({Name = "Void Y Limit", Range = {-500, 0}, Increment = 10, Suffix = " Y", CurrentValue = -400, Flag = "VoidYLimitSlider", Callback = function(v) Settings.AntiVoid.VoidYLimit = v end})
 
+-- 👁️ Visuals Tab
 local VisualTab = Window:CreateTab("ESP & Visuals", 4483362458)
 VisualTab:CreateSection("ESP Player Status")
 VisualTab:CreateToggle({Name = "Enable Player ESP", CurrentValue = false, Flag = "ESPToggle", Callback = function(v) Settings.ESP.Enabled = v end})
