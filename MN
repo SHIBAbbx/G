@@ -300,7 +300,7 @@ MainTab:CreateSection("Stamina & Anti-Void")
 MainTab:CreateToggle({Name = "Infinite Stamina", CurrentValue = false, Flag = "InfStaminaToggle", Callback = function(v) Settings.InfStamina.Enabled = v end})
 MainTab:CreateToggle({Name = "Enable Anti-Void", CurrentValue = false, Flag = "AntiVoidToggle", Callback = function(v) Settings.AntiVoid.Enabled = v end})
 MainTab:CreateToggle({Name = "Teleport Back Mode", CurrentValue = true, Flag = "AntiVoidMode", Callback = function(v) Settings.AntiVoid.UseTeleportBack = v end})
-MainTab:CreateSlider({Name = "Void Y Limit", Range = {-500, 0}, Increment = 10, Suffix = " Y", CurrentValue = -50, Flag = "VoidYLimitSlider", Callback = function(v) Settings.AntiVoid.VoidYLimit = v end})
+MainTab:CreateSlider({Name = "Void Y Limit", Range = {-500, 0}, Increment = 10, Suffix = " Y", CurrentValue = -400, Flag = "VoidYLimitSlider", Callback = function(v) Settings.AntiVoid.VoidYLimit = v end})
 
 local VisualTab = Window:CreateTab("ESP & Visuals", 4483362458)
 VisualTab:CreateSection("ESP Player Status")
